@@ -47,22 +47,29 @@ jobs:
         run: |
             echo "test starting test::"
             shard_tests="${{ steps.read_yaml.outputs.result }}"
+            echo "test starting test::"
+            shard_tests="${{ steps.read_yaml.outputs.result }}"
             echo "Shard tests are: $shard_tests"
             shard_index=${{ matrix.shardIndex }}
             echo "Shard tests for shard $shard_index :: "            
-            
+
             # Remove leading and trailing whitespaces from shard_tests
             shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
-            
+
             echo "Running test : $shard_tests"
-            
+
             # Split shard_tests into multiple arguments and pass them to the command
             IFS=', ' read -r -a tests_array <<< "$shard_tests"
-            echo "npx playwright test ${tests_array[@]}"
+
+            # Print each individual test for debugging
+            for test_path in "${tests_array[@]}"; do
+                echo "Test path: $test_path"
+            done
+
+            # Execute the command
+            echo "npx playwright test ${tests_array[*]}"
             npx playwright test "${tests_array[@]}"
-            
-        
-          
+
         
       
       
