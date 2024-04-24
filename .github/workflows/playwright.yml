@@ -44,20 +44,20 @@ jobs:
         uses: mikefarah/yq@master
         id: read_yaml
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' tests/test_mapping.json
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' tests/shard.json
       
       - name: Running tests
         run: |
-          shard_tests=${{ steps.read_yaml.outputs.result }}
+          shard_tests="${{ steps.read_yaml.outputs.result }}"
           echo "Shard tests are:"
-          echo "${{ steps.read_yaml.outputs.result }}"
+          echo "$shard_tests"
           shard_index=${{ matrix.shardIndex }}
           echo "Shard tests for shard $shard_index:"
-          echo "get all test to be executed"
-          echo "chmod +x $shard_tests"
-          chmod +x $shard_tests
-          echo "npx playwright test $shard_tests"
-          npx playwright test $shard_tests
+          for test_file in $shard_tests; do
+            echo "Running test: $test_file"
+            npx playwright test $test_file
+          done
+      
       
 
       - name: Upload blob report to GitHub Actions Artifacts
