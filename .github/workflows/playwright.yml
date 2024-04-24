@@ -29,7 +29,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 18x
+          node-version: 20
 
       - name: Install dependencies
         run: npm ci
@@ -37,30 +37,25 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
-      - name: Read yaml
-        uses: mikefarah/yq@master
-        id: read_yaml
-        with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml
-    
-      - name: Load and Parse YAML File
-        id: load_yaml
-        run: |
-          yaml_content=$(<.github/workflows/test_mapping.yml)
-          echo "::set-output name=yamlContent::$yaml_content"
+      - name: Install js-yaml
+        run: npm install js-yaml
 
-      - name: Running tests
+      - name: Load and Parse JSON File
+        id: load_json
         run: |
-          shard_config=$(<.github/workflows/test_mapping.yml)
-          shard_tests=${{ steps.read_yaml.outputs.result }}
-          echo "Shard tests are:"
-          echo "${{ steps.read_yaml.outputs.result }}"
-          shard_index=${{ matrix.shardIndex}}
-          echo "Shard tests for shard $shard_index:"
-          echo "get all test to be executed"
-          echo "npx playwright test $shard_tests"
+          json_content=$(cat tests/test_mapping.json)
+          shard_tests=$(echo "$json_content" | grep -oP '"3": \K.*(?=,)' | sed 's/ *//g' | sed 's/"//g' | sed 's/\[//' | sed 's/\]//' | sed 's/,/ /g')
+          echo "::set-output name=shardTests::$shard_tests"
+
+      - name: Run Playwright tests
+        id: playwright_tests
+        run: |
+          shard_tests="${{ steps.load_json.outputs.shardTests }}"
+          echo "Shard tests for shard ${{ matrix.shardIndex }}:"
+          echo "$shard_tests"
+          # Iterate over each test file and execute it
           npx playwright test $shard_tests
-          echo "test success"
+          echo "4"
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
