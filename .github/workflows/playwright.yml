@@ -44,42 +44,27 @@ jobs:
         uses: mikefarah/yq@master
         id: read_yaml
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' tests/test_mapping.json
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml 
       
       - name: Running tests
         run: |
-          shard_tests="${{ steps.read_yaml.outputs.result }}"
-          echo "Shard tests are:"
-          echo "$shard_tests"
-          shard_index=${{ matrix.shardIndex }}
-          echo "Shard tests for shard $shard_index:"
-          
-          # Check if there is only one test
-          tests_count=$(echo "$shard_tests" | wc -l)
-          if [ "$tests_count" -eq 1 ]; then
-            echo "Running a single test: $shard_tests"
-            npx playwright test $shard_tests
-            echo "Test executed"
-          else
-            # Define the number of tests to execute simultaneously for each shard
-            batch_size=$((tests_count > 3 ? 3 : tests_count))  # Set batch_size to 3 if there are more than 3 tests, otherwise set it to the number of tests
+            echo "test starting test::"
+            shard_tests="${{ steps.read_yaml.outputs.result }}"
+            echo "Shard tests are: $shard_tests"
+            shard_index=${{ matrix.shardIndex }}
+            echo "Shard tests for shard $shard_index :: "
             
-            # Split tests into batches
-            tests_batches=$(echo "$shard_tests" | xargs -n $batch_size)
+            # Convert the shard_tests string into an array
+            shard_tests_array=($shard_tests)
             
-            # Loop through test batches
-            for tests_batch in $tests_batches; do
-              echo "Running tests batch: $tests_batch"
-              # Run tests in background
-              for test_file in $tests_batch; do
-                npx playwright test $test_file &
-              done
-              # Wait for all tests to finish
-              wait
-              echo "Tests executed"
+            # Loop over the array of test files
+            for test_file in "${shard_tests_array[@]}"; do
+            echo "Running test : $test_file"
+            echo "npx playwright test \"$test_file\""
+            npx playwright test "$test_file"
             done
-          fi
-      
+          
+        
       
       
 
