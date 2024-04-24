@@ -54,12 +54,11 @@ jobs:
             # Convert the shard_tests string into an array
             shard_tests_array=($shard_tests)
             
-            # Loop over the array of test files
-            for test_file in "${shard_tests_array[@]}"; do
+           
             echo "Running test : $test_file"
             echo "npx playwright test \"$test_file\""
             npx playwright test "$test_file"
-            done
+        
           
         
       
