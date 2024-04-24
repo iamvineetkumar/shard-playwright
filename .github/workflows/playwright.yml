@@ -54,6 +54,8 @@ jobs:
           shard_index=${{ matrix.shardIndex }}
           echo "Shard tests for shard $shard_index:"
           echo "get all test to be executed"
+          echo "chmod +x $shard_tests"
+          chmod +x $shard_tests
           echo "npx playwright test $shard_tests"
           npx playwright test $shard_tests
       
