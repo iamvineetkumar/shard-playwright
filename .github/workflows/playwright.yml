@@ -53,10 +53,33 @@ jobs:
           echo "$shard_tests"
           shard_index=${{ matrix.shardIndex }}
           echo "Shard tests for shard $shard_index:"
-          for test_file in $shard_tests; do
-            echo "Running test: $test_file"
-            npx playwright test $test_file
-          done
+          
+          # Check if there is only one test
+          tests_count=$(echo "$shard_tests" | wc -l)
+          if [ "$tests_count" -eq 1 ]; then
+            echo "Running a single test: $shard_tests"
+            npx playwright test $shard_tests
+            echo "Test executed"
+          else
+            # Define the number of tests to execute simultaneously for each shard
+            batch_size=$((tests_count > 3 ? 3 : tests_count))  # Set batch_size to 3 if there are more than 3 tests, otherwise set it to the number of tests
+            
+            # Split tests into batches
+            tests_batches=$(echo "$shard_tests" | xargs -n $batch_size)
+            
+            # Loop through test batches
+            for tests_batch in $tests_batches; do
+              echo "Running tests batch: $tests_batch"
+              # Run tests in background
+              for test_file in $tests_batch; do
+                npx playwright test $test_file &
+              done
+              # Wait for all tests to finish
+              wait
+              echo "Tests executed"
+            done
+          fi
+      
       
       
 
