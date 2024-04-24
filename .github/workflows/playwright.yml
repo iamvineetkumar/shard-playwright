@@ -44,7 +44,7 @@ jobs:
         uses: mikefarah/yq@master
         id: read_yaml
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' tests/shard.json
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' tests/test_mapping.json
       
       - name: Running tests
         run: |
