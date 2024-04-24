@@ -60,6 +60,7 @@ jobs:
           echo "get all test to be executed"
           echo "npx playwright test $shard_tests"
           npx playwright test $shard_tests
+          echo "test success"
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
