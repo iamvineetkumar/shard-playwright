@@ -49,15 +49,11 @@ jobs:
             shard_tests="${{ steps.read_yaml.outputs.result }}"
             echo "Shard tests are: $shard_tests"
             shard_index=${{ matrix.shardIndex }}
-            echo "Shard tests for shard $shard_index :: "
-            
-            # Convert the shard_tests string into an array
-            shard_tests_array=($shard_tests)
-            
+            echo "Shard tests for shard $shard_index :: "            
            
-            echo "Running test : $test_file"
-            echo "npx playwright test \"$test_file\""
-            npx playwright test "$test_file"
+            echo "Running test : $shard_tests"
+            echo "npx playwright test \"$shard_tests\""
+            npx playwright test "$shard_tests"
         
           
         
