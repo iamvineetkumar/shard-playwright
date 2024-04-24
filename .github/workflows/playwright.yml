@@ -35,10 +35,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-
-      - name: Install js-yaml
-        run: npm install js-yaml
+        run: npx playwright install
 
       - name: Read yaml
         uses: mikefarah/yq@master
