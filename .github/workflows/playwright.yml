@@ -51,3 +51,11 @@ jobs:
           echo "Shard tests for shard $shard_index:"
           echo "$shard_tests"
           # Iterate over each test file and execute it
+          npx playwright test $shard_tests
+          echo "4"
+      - name: Upload blob report to GitHub Actions Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: blob-report-${{ matrix.shardIndex }}
+          path: blob-report
+          retention-days: 1
