@@ -51,7 +51,7 @@ jobs:
 
       - name: Running tests
         run: |
-          shard_config=$(< tests/shard.yml)
+          shard_config=$(<.github/workflows/test_mapping.yml)
           shard_tests=${{ steps.read_yaml.outputs.result }}
           echo "Shard tests are:"
           echo "${{ steps.read_yaml.outputs.result }}"
