@@ -60,7 +60,7 @@ jobs:
             shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
             
             echo "npx playwright test $shard_tests"
-            npx playwright test $shard_tests --workers=4
+            npx playwright test $shard_tests --workers=4 --list
         
         
       
