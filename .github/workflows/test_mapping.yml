@@ -14,3 +14,4 @@ shards:
     tests:
       - tests/rbac/test-3.spec.ts
       - tests/rbac/test-4.spec.ts
+      - tests/rbac/test-9.spec.ts
