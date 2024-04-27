@@ -59,7 +59,7 @@ jobs:
             # Replace newlines with spaces
             shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
             
-            echo "npx playwright test $shard_tests"
+            echo "npx playwright test $shard_tests --list"
             npx playwright test $shard_tests --workers=4 --list
         
         
