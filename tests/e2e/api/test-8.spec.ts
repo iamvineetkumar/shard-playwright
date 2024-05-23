@@ -11,7 +11,7 @@ const TODO_ITEMS = [
   'book a doctors appointment'
 ];
 
-test.describe('New Todo - test -8 ', () => {
+test.describe('New Todo - test -8 @smoke ', () => {
   console.log("started - New Todo - test -2 of 1 ")
   test('should allow me to add todo items', async ({ page }) => {
     // create a new todo locator
@@ -39,7 +39,7 @@ test.describe('New Todo - test -8 ', () => {
     await checkNumberOfTodosInLocalStorage(page, 2);
   });
 
-  test('should clear text input field when an item is added', async ({ page }) => {
+  test('should clear text input field when an item is added @sanity', async ({ page }) => {
     // create a new todo locator
     const newTodo = page.getByPlaceholder('What needs to be done?');
 

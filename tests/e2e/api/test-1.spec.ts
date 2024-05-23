@@ -369,7 +369,7 @@ test.describe('Routing', () => {
     await checkTodosInLocalStorage(page, TODO_ITEMS[0]);
   });
 
-  test('should allow me to display active items', async ({ page }) => {
+  test('should allow me to display active items @sanity', async ({ page }) => {
     const todoItem = page.getByTestId('todo-item');
     await page.getByTestId('todo-item').nth(1).getByRole('checkbox').check();
     
@@ -379,7 +379,7 @@ test.describe('Routing', () => {
     await expect(todoItem).toHaveText([TODO_ITEMS[0], TODO_ITEMS[2]]);
   });
 
-  test('should respect the back button', async ({ page }) => {
+  test('should respect the back button @sanity', async ({ page }) => {
 
     const todoItem = page.getByTestId('todo-item');
     await page.getByTestId('todo-item').nth(1).getByRole('checkbox').check();
@@ -406,14 +406,14 @@ test.describe('Routing', () => {
     await expect(todoItem).toHaveCount(3);
   });
 
-  test('should allow me to display completed items', async ({ page }) => {
+  test('should allow me to display completed items @sanity', async ({ page }) => {
     await page.getByTestId('todo-item').nth(1).getByRole('checkbox').check();
     await checkNumberOfCompletedTodosInLocalStorage(page, 1);
     await page.getByRole('link', { name: 'Completed' }).click();
     await expect(page.getByTestId('todo-item')).toHaveCount(1);
   });
 
-  test('should allow me to display all items', async ({ page }) => {
+  test('should allow me to display all items @smoke', async ({ page }) => {
     await page.getByTestId('todo-item').nth(1).getByRole('checkbox').check();
     await checkNumberOfCompletedTodosInLocalStorage(page, 1);
     await page.getByRole('link', { name: 'Active' }).click();
@@ -422,7 +422,7 @@ test.describe('Routing', () => {
     await expect(page.getByTestId('todo-item')).toHaveCount(3);
   });
 
-  test('should highlight the currently applied filter', async ({ page }) => {
+  test('should highlight the currently applied filter @smoke', async ({ page }) => {
     await expect(page.getByRole('link', { name: 'All' })).toHaveClass('selected');
 
     //create locators for active and completed links

@@ -73,7 +73,7 @@ test.describe('New Todo - test -2 ', () => {
 
 });
 
-test.describe('Mark all as completed', () => {
+test.describe('Mark all as completed @sanity', () => {
   console.log("started - New Todo - test -2 of 2 ")
 
   test.beforeEach(async ({ page }) => {
@@ -85,7 +85,7 @@ test.describe('Mark all as completed', () => {
     await checkNumberOfTodosInLocalStorage(page, 3);
   });
 
-  test('should allow me to mark all items as completed', async ({ page }) => {
+  test('should allow me to mark all items as completed @sanity', async ({ page }) => {
     // Complete all todos.
     await page.getByLabel('Mark all as complete').check();
 

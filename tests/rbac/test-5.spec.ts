@@ -11,7 +11,7 @@ const TODO_ITEMS = [
   'book a doctors appointment'
 ];
 
-test.describe('New Todo - test -5 ', () => {
+test.describe('New Todo - test -5  @sanity', () => {
   console.log("started - New Todo - test -2 of 1 ")
   test('should allow me to add todo items', async ({ page }) => {
     // create a new todo locator
