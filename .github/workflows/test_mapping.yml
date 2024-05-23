@@ -9,4 +9,3 @@ shards:
   3:
     tests:
       - tests/rbac
-
