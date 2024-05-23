@@ -2,19 +2,30 @@ name: Playwright Tests
 
 on:
   push:
-    branches: [dev]
+    branches: [dev2]
+  workflow_dispatch:
+      inputs:
+        testTag:
+          description: 'Select the type of tests to run'
+          required: true
+          type: choice
+          options:
+            - sanity
+            - smoke
+          default: 'sanity'  # Default tag
 
 jobs:
   playwright-tests:
-    timeout-minutes: 4
+    timeout-minutes: 2
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shardIndex: [1, 2, 3, 4]
-        shardTotal: [4]
+        shardIndex: [1, 2, 3]
+        shardTotal: [3]
     steps:
       - uses: actions/checkout@v4
+
       - name: Cache Node.js modules
         uses: actions/cache@v2
         with:
@@ -22,46 +33,48 @@ jobs:
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
+
       - name: Install js-yaml
         run: npm install js-yaml
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 19
+
       - name: Install dependencies
         run: npm ci
+
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-      - name: Install js-yaml
-        run: npm install js-yaml
-      - name: Install yq
+        run: npx playwright install
+
+      - name: Read yaml
+        uses: mikefarah/yq@master
+        id: read_yaml
+        with:
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml 
+      
+      - name: Running tests
         run: |
-          curl -L https://github.com/mikefarah/yq/releases/download/v4.11.1/yq_linux_amd64 -o /usr/local/bin/yq
-          chmod +x /usr/local/bin/yq
-          echo "export PATH=\$PATH:~/.local/bin"
-      - name: Load and Parse YAML File
-        id: load_yaml
-        run: |
-          yaml_content=$(<.github/workflows/test_mapping.yml)
-          echo "::set-output name=yamlContent::$yaml_content"
-      - name: Run Playwright tests
-        id: playwright_tests
-        run: |
-          shard_config=$(< .github/workflows/test_mapping.yml)
-          shard_index=${{ matrix.shardIndex }}
-          shard_tests=$(echo "$shard_config" | yq eval ".shards[$shard_index].tests | .[]" -)
-          echo "Shard tests for shard $shard_index:"
-          echo "$shard_tests"
-          # Iterate over each test file and execute it
-          for test_file in $shard_tests; do
-            echo "Running test file: $test_file"
-            echo "Node.js version: $(node --version)"
-            echo "Playwright version: $(npx playwright --version)"
-            echo "1"
-            echo "npx playwright test $test_file --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} | tee executed_tests_shard_${{ matrix.shardIndex }}.txt --list"
-            echo "3"
-            npx playwright test $shard_tests  
-            echo "4"
-          done
+            echo "test starting test::"
+            shard_tests="${{ steps.read_yaml.outputs.result }}"
+            echo "Shard tests are: $shard_tests"
+            shard_index=${{ matrix.shardIndex }}
+            echo "Shard tests for shard $shard_index :: "            
+            
+            # Remove leading and trailing whitespaces from shard_tests
+            shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
+            
+            echo "Running test : $shard_tests"
+            
+            # Replace newlines with spaces
+            shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
+            echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
+            npx playwright test --grep @${{ github.event.inputs.testTag }} $tests --workers=4
+        
+        
+      
+      
+
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
         with:
