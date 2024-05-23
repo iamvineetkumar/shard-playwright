@@ -69,6 +69,7 @@ jobs:
             # Replace newlines with spaces
             shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
             echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
+            echo "npx playwright test --grep @${{ github.event.inputs.testTag }} --list"
             npx playwright test --grep @${{ github.event.inputs.testTag }} $tests --workers=4
         
         
