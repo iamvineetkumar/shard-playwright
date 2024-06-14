@@ -118,7 +118,7 @@ jobs:
           # Replace newlines with spaces
           tests=$(echo "$tests" | tr '\n' ' ')
           echo "Running tests with tag: sanity"
-          npx playwright test $tests --workers=4
+          npx playwright test --grep @sanity  $tests --workers=4
 
       - name: Running tests for smoke
         if: github.event.inputs.testTag == 'smoke'
@@ -134,7 +134,7 @@ jobs:
           # Replace newlines with spaces
           tests=$(echo "$tests" | tr '\n' ' ')
           echo "Running tests with tag: smoke"
-          npx playwright test $tests --workers=4
+          npx playwright test --grep @smoke $tests --workers=4
 
       - name: Running tests for e2eFrontEnd
         if: github.event.inputs.testTag == 'e2eFrontEnd'
