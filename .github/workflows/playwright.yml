@@ -64,21 +64,21 @@ jobs:
         uses: mikefarah/yq@master
         id: read_yaml_sanity
         with:
-          cmd: yq eval '.tests | .[]' .github/workflows/sanity.yml
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/smoke.yml
 
       - name: Read yaml for smoke
         if: github.event.inputs.testTag == 'smoke'
         uses: mikefarah/yq@master
         id: read_yaml_smoke
         with:
-          cmd: yq eval '.tests | .[]' .github/workflows/smoke.yml
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/sanity.yml
 
       - name: Read yaml for e2eFrontEnd
         if: github.event.inputs.testTag == 'e2eFrontEnd'
         uses: mikefarah/yq@master
         id: read_yaml_shard
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/shard.yml
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml
 
       - name: Debug sanity tests
         if: github.event.inputs.testTag == 'sanity'
