@@ -2,7 +2,7 @@ name: Playwright Tests
 
 on:
   push:
-    branches: [dev3]
+    branches: [dev2]
   workflow_dispatch:
     inputs:
       testTag:
@@ -13,17 +13,16 @@ on:
           - sanity
           - smoke
           - e2eFrontEnd
-        default: 'e2eFrontEnd'  # Default tag
+        default: 'sanity'  # Default tag
 
 jobs:
   playwright-tests:
-    timeout-minutes: 2
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         shardIndex: [1, 2, 3]
-        shardTotal: [3]
     steps:
       - uses: actions/checkout@v4
 
@@ -48,6 +47,18 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install
 
+      - name: Print sanity.yml content
+        if: github.event.inputs.testTag == 'sanity'
+        run: cat .github/workflows/sanity.yml
+
+      - name: Print smoke.yml content
+        if: github.event.inputs.testTag == 'smoke'
+        run: cat .github/workflows/smoke.yml
+
+      - name: Print shard.yml content
+        if: github.event.inputs.testTag == 'e2eFrontEnd'
+        run: cat .github/workflows/shard.yml
+
       - name: Read yaml for sanity
         if: github.event.inputs.testTag == 'sanity'
         uses: mikefarah/yq@master
@@ -67,12 +78,35 @@ jobs:
         uses: mikefarah/yq@master
         id: read_yaml_shard
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/shard.yml
+
+      - name: Debug sanity tests
+        if: github.event.inputs.testTag == 'sanity'
+        run: |
+          echo "Raw YAML output:"
+          echo "${{ steps.read_yaml_sanity.outputs.result }}"
+          tests="${{ steps.read_yaml_sanity.outputs.result }}"
+          echo "Tests are: $tests"
+
+      - name: Debug smoke tests
+        if: github.event.inputs.testTag == 'smoke'
+        run: |
+          echo "Raw YAML output:"
+          echo "${{ steps.read_yaml_smoke.outputs.result }}"
+          tests="${{ steps.read_yaml_smoke.outputs.result }}"
+          echo "Tests are: $tests"
+
+      - name: Debug e2eFrontEnd tests
+        if: github.event.inputs.testTag == 'e2eFrontEnd'
+        run: |
+          echo "Raw YAML output:"
+          echo "${{ steps.read_yaml_shard.outputs.result }}"
+          shard_tests="${{ steps.read_yaml_shard.outputs.result }}"
+          echo "Shard tests are: $shard_tests"
 
       - name: Running tests for sanity
         if: github.event.inputs.testTag == 'sanity'
         run: |
-          echo "test starting test::"
           tests="${{ steps.read_yaml_sanity.outputs.result }}"
           echo "Tests are: $tests"
             
@@ -84,12 +118,11 @@ jobs:
           # Replace newlines with spaces
           tests=$(echo "$tests" | tr '\n' ' ')
           echo "Running tests with tag: sanity"
-          npx playwright test --grep @sanity $tests --workers=4
+          npx playwright test $tests --workers=4
 
       - name: Running tests for smoke
         if: github.event.inputs.testTag == 'smoke'
         run: |
-          echo "test starting test::"
           tests="${{ steps.read_yaml_smoke.outputs.result }}"
           echo "Tests are: $tests"
             
@@ -101,12 +134,11 @@ jobs:
           # Replace newlines with spaces
           tests=$(echo "$tests" | tr '\n' ' ')
           echo "Running tests with tag: smoke"
-          npx playwright test --grep @smoke $tests --workers=4
+          npx playwright test $tests --workers=4
 
       - name: Running tests for e2eFrontEnd
         if: github.event.inputs.testTag == 'e2eFrontEnd'
         run: |
-          echo "test starting test::"
           shard_tests="${{ steps.read_yaml_shard.outputs.result }}"
           echo "Shard tests are: $shard_tests"
           shard_index=${{ matrix.shardIndex }}
