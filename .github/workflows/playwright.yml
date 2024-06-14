@@ -17,12 +17,18 @@ on:
 
 jobs:
   playwright-tests:
-    timeout-minutes: 20
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        shardIndex: ${{ fromJson(steps.read_yaml_shardIndex.outputs.shardIndex) }}
+      matrix: 
+        include:
+          - testTag: sanity
+            shardIndex: [1]  # Define shardIndex for sanity tests
+          - testTag: smoke
+            shardIndex: [1, 2]  # Define shardIndex for smoke tests
+          - testTag: e2eFrontEnd
+            shardIndex: [1, 2, 3]  # Define shardIndex for e2eFrontEnd tests
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -49,43 +55,18 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install
 
-      - name: Read shardIndex for selected test
-        id: read_yaml_shardIndex
-        run: |
-          if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
-            shard_index=$(yq eval '.shardIndex | .[]' .github/workflows/sanity.yml)
-          elif [ "${{ github.event.inputs.testTag }}" == "smoke" ]; then
-            shard_index=$(yq eval '.shardIndex | .[]' .github/workflows/smoke.yml)
-          elif [ "${{ github.event.inputs.testTag }}" == "e2eFrontEnd" ]; then
-            shard_index=$(yq eval '.shardIndex | .[]' .github/workflows/shard.yml)
-          else
-            echo "Unsupported test tag selected"
-            exit 1
-          fi
-          echo "::set-output name=shardIndex::$shard_index"
-
       - name: Read tests for selected test
         id: read_yaml_tests
         run: |
-          if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
-            tests=$(yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/sanity.yml)
-          elif [ "${{ github.event.inputs.testTag }}" == "smoke" ]; then
-            tests=$(yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/smoke.yml)
-          elif [ "${{ github.event.inputs.testTag }}" == "e2eFrontEnd" ]; then
-            tests=$(yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/shard.yml)
-          else
-            echo "Unsupported test tag selected"
-            exit 1
-          fi
+          tests=$(yq eval ".shards[${{ matrix.shardIndex }}].tests | .[]" .github/workflows/${{ matrix.testTag }}.yml)
           echo "::set-output name=tests::$tests"
 
       - name: Debug tests
         run: |
-          echo "Shard Index: ${{ steps.read_yaml_shardIndex.outputs.shardIndex }}"
+          echo "Shard Index: ${{ matrix.shardIndex }}"
           echo "Tests are: ${{ steps.read_yaml_tests.outputs.tests }}"
 
       - name: Run Playwright tests
-        if: github.event.inputs.testTag == 'sanity' || github.event.inputs.testTag == 'smoke' || github.event.inputs.testTag == 'e2eFrontEnd'
         run: |
           tests="${{ steps.read_yaml_tests.outputs.tests }}"
 
@@ -96,15 +77,15 @@ jobs:
           tests=$(echo "$tests" | tr '\n' ' ')
 
           if [ -n "$tests" ]; then
-            echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
+            echo "Running tests with tag: ${{ matrix.testTag }}"
             npx playwright test $tests --workers=4
           else
-            echo "No tests found for tag: ${{ github.event.inputs.testTag }}"
+            echo "No tests found for tag: ${{ matrix.testTag }}"
           fi
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: blob-report-${{ matrix.shardIndex }}
+          name: blob-report-${{ matrix.testTag }}-${{ matrix.shardIndex }}
           path: blob-report
           retention-days: 1
