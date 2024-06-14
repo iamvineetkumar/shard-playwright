@@ -22,9 +22,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shardIndex: [1, 2, 3]
+        shardIndex: ${{ fromJson(steps.read_yaml_shardIndex.outputs.shardIndex) }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Cache Node.js modules
         uses: actions/cache@v2
@@ -37,9 +38,10 @@ jobs:
       - name: Install js-yaml
         run: npm install js-yaml
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 19
+          node-version: 14
 
       - name: Install dependencies
         run: npm ci
@@ -47,112 +49,58 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install
 
-      - name: Print sanity.yml content
-        if: github.event.inputs.testTag == 'sanity'
-        run: cat .github/workflows/sanity.yml
-
-      - name: Print smoke.yml content
-        if: github.event.inputs.testTag == 'smoke'
-        run: cat .github/workflows/smoke.yml
-
-      - name: Print shard.yml content
-        if: github.event.inputs.testTag == 'e2eFrontEnd'
-        run: cat .github/workflows/shard.yml
-
-      - name: Read yaml for sanity
-        if: github.event.inputs.testTag == 'sanity'
-        uses: mikefarah/yq@master
-        id: read_yaml_sanity
-        with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/smoke.yml
-
-      - name: Read yaml for smoke
-        if: github.event.inputs.testTag == 'smoke'
-        uses: mikefarah/yq@master
-        id: read_yaml_smoke
-        with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/sanity.yml
-
-      - name: Read yaml for e2eFrontEnd
-        if: github.event.inputs.testTag == 'e2eFrontEnd'
-        uses: mikefarah/yq@master
-        id: read_yaml_shard
-        with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml
-
-      - name: Debug sanity tests
-        if: github.event.inputs.testTag == 'sanity'
+      - name: Read shardIndex for selected test
+        id: read_yaml_shardIndex
         run: |
-          echo "Raw YAML output:"
-          echo "${{ steps.read_yaml_sanity.outputs.result }}"
-          tests="${{ steps.read_yaml_sanity.outputs.result }}"
-          echo "Tests are: $tests"
+          if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
+            shard_index=$(yq eval '.shardIndex | .[]' .github/workflows/sanity.yml)
+          elif [ "${{ github.event.inputs.testTag }}" == "smoke" ]; then
+            shard_index=$(yq eval '.shardIndex | .[]' .github/workflows/smoke.yml)
+          elif [ "${{ github.event.inputs.testTag }}" == "e2eFrontEnd" ]; then
+            shard_index=$(yq eval '.shardIndex | .[]' .github/workflows/shard.yml)
+          else
+            echo "Unsupported test tag selected"
+            exit 1
+          fi
+          echo "::set-output name=shardIndex::$shard_index"
 
-      - name: Debug smoke tests
-        if: github.event.inputs.testTag == 'smoke'
+      - name: Read tests for selected test
+        id: read_yaml_tests
         run: |
-          echo "Raw YAML output:"
-          echo "${{ steps.read_yaml_smoke.outputs.result }}"
-          tests="${{ steps.read_yaml_smoke.outputs.result }}"
-          echo "Tests are: $tests"
+          if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
+            tests=$(yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/sanity.yml)
+          elif [ "${{ github.event.inputs.testTag }}" == "smoke" ]; then
+            tests=$(yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/smoke.yml)
+          elif [ "${{ github.event.inputs.testTag }}" == "e2eFrontEnd" ]; then
+            tests=$(yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/shard.yml)
+          else
+            echo "Unsupported test tag selected"
+            exit 1
+          fi
+          echo "::set-output name=tests::$tests"
 
-      - name: Debug e2eFrontEnd tests
-        if: github.event.inputs.testTag == 'e2eFrontEnd'
+      - name: Debug tests
         run: |
-          echo "Raw YAML output:"
-          echo "${{ steps.read_yaml_shard.outputs.result }}"
-          shard_tests="${{ steps.read_yaml_shard.outputs.result }}"
-          echo "Shard tests are: $shard_tests"
+          echo "Shard Index: ${{ steps.read_yaml_shardIndex.outputs.shardIndex }}"
+          echo "Tests are: ${{ steps.read_yaml_tests.outputs.tests }}"
 
-      - name: Running tests for sanity
-        if: github.event.inputs.testTag == 'sanity'
+      - name: Run Playwright tests
+        if: github.event.inputs.testTag == 'sanity' || github.event.inputs.testTag == 'smoke' || github.event.inputs.testTag == 'e2eFrontEnd'
         run: |
-          tests="${{ steps.read_yaml_sanity.outputs.result }}"
-          echo "Tests are: $tests"
-            
+          tests="${{ steps.read_yaml_tests.outputs.tests }}"
+
           # Remove leading and trailing whitespaces from tests
           tests=$(echo "$tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
-            
-          echo "Running test : $tests"
-            
+
           # Replace newlines with spaces
           tests=$(echo "$tests" | tr '\n' ' ')
-          echo "Running tests with tag: sanity"
-          npx playwright test --grep @sanity  $tests --workers=4
 
-      - name: Running tests for smoke
-        if: github.event.inputs.testTag == 'smoke'
-        run: |
-          tests="${{ steps.read_yaml_smoke.outputs.result }}"
-          echo "Tests are: $tests"
-            
-          # Remove leading and trailing whitespaces from tests
-          tests=$(echo "$tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
-            
-          echo "Running test : $tests"
-            
-          # Replace newlines with spaces
-          tests=$(echo "$tests" | tr '\n' ' ')
-          echo "Running tests with tag: smoke"
-          npx playwright test --grep @smoke $tests --workers=4
-
-      - name: Running tests for e2eFrontEnd
-        if: github.event.inputs.testTag == 'e2eFrontEnd'
-        run: |
-          shard_tests="${{ steps.read_yaml_shard.outputs.result }}"
-          echo "Shard tests are: $shard_tests"
-          shard_index=${{ matrix.shardIndex }}
-          echo "Shard tests for shard $shard_index :: "            
-            
-          # Remove leading and trailing whitespaces from shard_tests
-          shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
-            
-          echo "Running test : $shard_tests"
-            
-          # Replace newlines with spaces
-          shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
-          echo "Running tests with tag: e2eFrontEnd"
-          npx playwright test $shard_tests --workers=4
+          if [ -n "$tests" ]; then
+            echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
+            npx playwright test $tests --workers=4
+          else
+            echo "No tests found for tag: ${{ github.event.inputs.testTag }}"
+          fi
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
