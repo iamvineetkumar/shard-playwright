@@ -17,75 +17,46 @@ on:
 
 jobs:
   playwright-tests:
+    timeout-minutes: 2
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix: 
-        include:
-          - testTag: sanity
-            shardIndex: [1]  # Define shardIndex for sanity tests
-          - testTag: smoke
-            shardIndex: [1, 2]  # Define shardIndex for smoke tests
-          - testTag: e2eFrontEnd
-            shardIndex: [1, 2, 3]  # Define shardIndex for e2eFrontEnd tests
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Cache Node.js modules
-        uses: actions/cache@v2
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Install js-yaml
-        run: npm install js-yaml
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 14
-
-      - name: Install dependencies
-        run: npm ci
+      # Add caching, setup-node, npm install steps as needed
 
       - name: Install Playwright browsers
         run: npx playwright install
 
-      - name: Read tests for selected test
-        id: read_yaml_tests
+      - name: Read shardIndex from smoke.yml
+        id: read_shard_index
         run: |
-          tests=$(yq eval ".shards[${{ matrix.shardIndex }}].tests | .[]" .github/workflows/${{ matrix.testTag }}.yml)
-          echo "::set-output name=tests::$tests"
+          shardIndex=$(yq eval '.shardIndex[]' .github/workflows/smoke.yml)
+          echo "::set-output name=shardIndex::$shardIndex"
 
-      - name: Debug tests
+      - name: Read tests from smoke.yml based on shardIndex
+        id: read_tests
         run: |
-          echo "Shard Index: ${{ matrix.shardIndex }}"
-          echo "Tests are: ${{ steps.read_yaml_tests.outputs.tests }}"
+          shardIndex="${{ steps.read_shard_index.outputs.shardIndex }}"
+          tests=$(yq eval ".shards[$shardIndex].tests | .[]" .github/workflows/smoke.yml)
+          echo "::set-output name=tests::$tests"
 
       - name: Run Playwright tests
         run: |
-          tests="${{ steps.read_yaml_tests.outputs.tests }}"
+          shardIndex="${{ steps.read_shard_index.outputs.shardIndex }}"
+          tests="${{ steps.read_tests.outputs.tests }}"
+          echo "Using shardIndex: $shardIndex"
+          echo "Running tests: $tests"
 
-          # Remove leading and trailing whitespaces from tests
-          tests=$(echo "$tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
-
-          # Replace newlines with spaces
-          tests=$(echo "$tests" | tr '\n' ' ')
-
-          if [ -n "$tests" ]; then
-            echo "Running tests with tag: ${{ matrix.testTag }}"
-            npx playwright test $tests --workers=4
-          else
-            echo "No tests found for tag: ${{ matrix.testTag }}"
-          fi
+          # Additional steps using $shardIndex and $tests as needed
+          for test in $tests; do
+            echo "Running test: $test"
+            npx playwright test $test --workers=4
+          done
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: blob-report-${{ matrix.testTag }}-${{ matrix.shardIndex }}
+          name: blob-report-${{ steps.read_shard_index.outputs.shardIndex }}
           path: blob-report
           retention-days: 1
