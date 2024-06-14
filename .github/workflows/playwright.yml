@@ -4,15 +4,16 @@ on:
   push:
     branches: [dev2]
   workflow_dispatch:
-      inputs:
-        testTag:
-          description: 'Select the type of tests to run'
-          required: true
-          type: choice
-          options:
-            - sanity
-            - smoke
-          default: 'sanity'  # Default tag
+    inputs:
+      testTag:
+        description: 'Select the type of tests to run'
+        required: true
+        type: choice
+        options:
+          - sanity
+          - smoke
+          - e2eFrontEnd
+        default: 'e2eFrontEnd'  # Default tag
 
 jobs:
   playwright-tests:
@@ -47,34 +48,79 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install
 
-      - name: Read yaml
+      - name: Read yaml for sanity
+        if: github.event.inputs.testTag == 'sanity'
         uses: mikefarah/yq@master
-        id: read_yaml
+        id: read_yaml_sanity
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml 
-      
-      - name: Running tests
+          cmd: yq eval '.tests | .[]' .github/workflows/sanity.yml
+
+      - name: Read yaml for smoke
+        if: github.event.inputs.testTag == 'smoke'
+        uses: mikefarah/yq@master
+        id: read_yaml_smoke
+        with:
+          cmd: yq eval '.tests | .[]' .github/workflows/smoke.yml
+
+      - name: Read yaml for e2eFrontEnd
+        if: github.event.inputs.testTag == 'e2eFrontEnd'
+        uses: mikefarah/yq@master
+        id: read_yaml_shard
+        with:
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml
+
+      - name: Running tests for sanity
+        if: github.event.inputs.testTag == 'sanity'
         run: |
-            echo "test starting test::"
-            shard_tests="${{ steps.read_yaml.outputs.result }}"
-            echo "Shard tests are: $shard_tests"
-            shard_index=${{ matrix.shardIndex }}
-            echo "Shard tests for shard $shard_index :: "            
+          echo "test starting test::"
+          tests="${{ steps.read_yaml_sanity.outputs.result }}"
+          echo "Tests are: $tests"
             
-            # Remove leading and trailing whitespaces from shard_tests
-            shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
+          # Remove leading and trailing whitespaces from tests
+          tests=$(echo "$tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
             
-            echo "Running test : $shard_tests"
+          echo "Running test : $tests"
             
-            # Replace newlines with spaces
-            shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
-            echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
-            echo "npx playwright test --grep @${{ github.event.inputs.testTag }} --list"
-            npx playwright test --grep @${{ github.event.inputs.testTag }} $tests --workers=4
-        
-        
-      
-      
+          # Replace newlines with spaces
+          tests=$(echo "$tests" | tr '\n' ' ')
+          echo "Running tests with tag: sanity"
+          npx playwright test --grep @sanity $tests --workers=4
+
+      - name: Running tests for smoke
+        if: github.event.inputs.testTag == 'smoke'
+        run: |
+          echo "test starting test::"
+          tests="${{ steps.read_yaml_smoke.outputs.result }}"
+          echo "Tests are: $tests"
+            
+          # Remove leading and trailing whitespaces from tests
+          tests=$(echo "$tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
+            
+          echo "Running test : $tests"
+            
+          # Replace newlines with spaces
+          tests=$(echo "$tests" | tr '\n' ' ')
+          echo "Running tests with tag: smoke"
+          npx playwright test --grep @smoke $tests --workers=4
+
+      - name: Running tests for e2eFrontEnd
+        if: github.event.inputs.testTag == 'e2eFrontEnd'
+        run: |
+          echo "test starting test::"
+          shard_tests="${{ steps.read_yaml_shard.outputs.result }}"
+          echo "Shard tests are: $shard_tests"
+          shard_index=${{ matrix.shardIndex }}
+          echo "Shard tests for shard $shard_index :: "            
+            
+          # Remove leading and trailing whitespaces from shard_tests
+          shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
+            
+          echo "Running test : $shard_tests"
+            
+          # Replace newlines with spaces
+          shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
+          echo "Running tests with tag: e2eFrontEnd"
+          npx playwright test $shard_tests --workers=4
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2

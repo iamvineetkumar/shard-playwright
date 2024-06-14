@@ -12,6 +12,12 @@ const { defineConfig, devices } = require('@playwright/test');
  */
 module.exports = defineConfig({
   testDir: './tests',
+  outputDir: 'test-results', // Custom output directory for test results
+  reporter: [
+    ['list'], // Default console reporter
+    ['json', { outputFile: 'test-results/report.json' }], // JSON reporter
+    ['html', { outputFolder: 'test-results/html-report', open: 'never' }] // HTML reporter
+  ],
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
