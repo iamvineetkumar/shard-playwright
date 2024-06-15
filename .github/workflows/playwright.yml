@@ -41,16 +41,21 @@ jobs:
               exit 1
             fi
         continue-on-error: true  # Continue even if one file doesn't exist or doesn't match the tag
-        # Ensure output is in JSON array format even if empty or single value
+        shell: bash
         env:
           OUTPUT_FORMAT: ${{ steps.read-shard-indices.outputs.result || '[]' }}
 
       - name: Set matrix
         id: set-matrix
         run: |
-          matrix=$(echo "${{ env.OUTPUT_FORMAT }}" | jq -n '{
-            shardIndex: .[]
-          }')
+          if [ -z "${{ env.OUTPUT_FORMAT }}" ]; then
+            echo "No shard indices found."
+            matrix='{}'
+          else
+            matrix=$(echo "${{ env.OUTPUT_FORMAT }}" | jq -n '{
+              shardIndex: .[]
+            }')
+          fi
           echo "::set-output name=matrix::$matrix"
 
   playwright-tests:
