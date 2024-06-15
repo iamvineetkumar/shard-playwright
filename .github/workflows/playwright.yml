@@ -31,16 +31,17 @@ jobs:
         with:
           cmd: |
             if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
-              yq eval '.shards | keys | map(tonumber)' .github/workflows/sanity.yml
+              yq eval '. | keys | map(tonumber)' .github/workflows/sanity.yml
             elif [ "${{ github.event.inputs.testTag }}" == "smoke" ]; then
-              yq eval '.shards | keys | map(tonumber)' .github/workflows/smoke.yml
+              yq eval '. | keys | map(tonumber)' .github/workflows/smoke.yml
             elif [ "${{ github.event.inputs.testTag }}" == "e2eFrontEnd" ]; then
-              yq eval '.shards | keys | map(tonumber)' .github/workflows/test_mapping.yml
+              yq eval '. | keys | map(tonumber)' .github/workflows/test_mapping.yml
             else
               echo "Unsupported testTag: ${{ github.event.inputs.testTag }}"
               exit 1
             fi
         continue-on-error: true  # Continue even if one file doesn't exist or doesn't match the tag
+       
         env:
           OUTPUT_FORMAT: ${{ steps.read-shard-indices.outputs.result || '[]' }}
 
@@ -87,19 +88,19 @@ jobs:
         uses: mikefarah/yq@master
         id: read_yaml_sanity
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/sanity.yml
+          cmd: yq eval '.[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/sanity.yml
       - name: Read yaml for smoke
         if: github.event.inputs.testTag == 'smoke'
         uses: mikefarah/yq@master
         id: read_yaml_smoke
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/smoke.yml
+          cmd: yq eval '.[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/smoke.yml
       - name: Read yaml for e2eFrontEnd
         if: github.event.inputs.testTag == 'e2eFrontEnd'
         uses: mikefarah/yq@master
         id: read_yaml_shard
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml
+          cmd: yq eval '.[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml
       - name: Running tests for sanity
         if: github.event.inputs.testTag == 'sanity'
         run: |
