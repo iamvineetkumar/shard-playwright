@@ -38,12 +38,16 @@ jobs:
           if [ "$testTag" == "sanity" ]; then
             shardIndex=$(yq eval '.shardIndex[0]' .github/workflows/sanity.yml)
             tests=$(yq eval ".shards[$shardIndex].tests | .[]" .github/workflows/sanity.yml)
+            echo "test"
+            echo "index are: $tests" 
           elif [ "$testTag" == "smoke" ]; then
             shardIndex=$(yq eval '.shardIndex[0]' .github/workflows/smoke.yml)
             tests=$(yq eval ".shards[$shardIndex].tests | .[]" .github/workflows/smoke.yml)
+            echo "index are: $tests" 
           elif [ "$testTag" == "e2eFrontEnd" ]; then
             shardIndex=$(yq eval '.shardIndex[0]' .github/workflows/shard.yml)  # Adjust as per your file name
             tests=$(yq eval ".shards[$shardIndex].tests | .[]" .github/workflows/shard.yml)  # Adjust as per your file name
+            echo "index are: $tests" 
           else
             echo "Invalid testTag specified."
             exit 1
