@@ -1,6 +1,5 @@
 shardIndex:
-  - 1
-  - 2
+  - 1,2
 shards:
   1:
     tests:
@@ -10,6 +9,3 @@ shards:
     tests:
       - tests/e2e/login
       - tests/e2e/logout
-  3:
-    tests:
-      - tests/e2e/dashboard
