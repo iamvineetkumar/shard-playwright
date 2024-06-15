@@ -13,26 +13,40 @@ on:
           - sanity
           - smoke
         default: 'sanity'  # Default tag
-      shardIndex:
-        description: 'Shard index to run'
-        required: true
-        type: integer
-        default: 1
       shardTotal:
         description: 'Total number of shards'
         required: true
-        type: integer
+        type: Integer
         default: 3
 
 jobs:
+  calculate-shard-index:
+    runs-on: ubuntu-latest
+    outputs:
+      shardIndex: ${{ steps.set_shard_index.outputs.shardIndex }}
+
+    steps:
+      - name: Set Shard Index
+        id: set_shard_index
+        run: |
+          if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
+            shardIndex='[1,2]'
+          elif [ "${{ github.event.inputs.testTag }}" == "smoke" ]; then
+            shardIndex='[1,2,3]'
+          else
+            shardIndex='[1]'  # Default shard index
+          fi
+          echo "shardIndex: $shardIndex"
+          echo "::set-output name=shardIndex::$shardIndex"
+
   playwright-tests:
+    needs: calculate-shard-index
     timeout-minutes: 10  # Adjust timeout as per your test suite's needs
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shardIndex: [${{ github.event.inputs.shardIndex }}]  # Pass the shardIndex input dynamically
-        shardTotal: [${{ github.event.inputs.shardTotal }}]
+        shardIndex: ${{ fromJson(needs.calculate-shard-index.outputs.shardIndex) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +94,7 @@ jobs:
           # Replace newlines with spaces
           shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
           echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
-          npx playwright test --grep @${{ github.event.inputs.testTag }} $tests --workers=4
+          npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=4
         
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
