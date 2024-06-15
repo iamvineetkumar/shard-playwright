@@ -1,5 +1,3 @@
-shardIndex:
-  - [1]
 shards:
   1:
     tests:
