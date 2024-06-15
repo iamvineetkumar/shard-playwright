@@ -1,4 +1,5 @@
 name: Playwright Tests
+
 on:
   push:
     branches: [dev2]
@@ -11,62 +12,31 @@ on:
         options:
           - sanity
           - smoke
-          - e2eFrontEnd
         default: 'sanity'  # Default tag
+      shardIndex:
+        description: 'Shard index to run'
+        required: true
+        type: integer
+        default: 1
+      shardTotal:
+        description: 'Total number of shards'
+        required: true
+        type: integer
+        default: 3
 
 jobs:
-  set-matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install js-yaml
-        run: npm install js-yaml
-
-      - name: Read shard indices
-        id: read-shard-indices
-        uses: mikefarah/yq@master
-        with:
-          cmd: |
-            if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
-              yq eval '. | keys | map(tonumber)' .github/workflows/sanity.yml
-            elif [ "${{ github.event.inputs.testTag }}" == "smoke" ]; then
-              yq eval '. | keys | map(tonumber)' .github/workflows/smoke.yml
-            elif [ "${{ github.event.inputs.testTag }}" == "e2eFrontEnd" ]; then
-              yq eval '. | keys | map(tonumber)' .github/workflows/test_mapping.yml
-            else
-              echo "Unsupported testTag: ${{ github.event.inputs.testTag }}"
-              exit 1
-            fi
-        continue-on-error: true  # Continue even if one file doesn't exist or doesn't match the tag
-       
-        env:
-          OUTPUT_FORMAT: ${{ steps.read-shard-indices.outputs.result || '[]' }}
-
-      - name: Set matrix
-        id: set-matrix
-        run: |
-          if [ -z "${{ env.OUTPUT_FORMAT }}" ]; then
-            echo "No shard indices found."
-            matrix='{}'
-          else
-            matrix=$(echo "${{ env.OUTPUT_FORMAT }}" | jq -n '{
-              shardIndex: .[]
-            }')
-          fi
-          echo "::set-output name=matrix::$matrix"
-
   playwright-tests:
-    needs: set-matrix
-    timeout-minutes: 20
+    timeout-minutes: 10  # Adjust timeout as per your test suite's needs
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+      matrix:
+        shardIndex: [${{ github.event.inputs.shardIndex }}]  # Pass the shardIndex input dynamically
+        shardTotal: [${{ github.event.inputs.shardTotal }}]
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Cache Node.js modules
         uses: actions/cache@v2
         with:
@@ -74,57 +44,44 @@ jobs:
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
+
       - name: Install js-yaml
         run: npm install js-yaml
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 19
+          node-version: '14'  # Adjust Node.js version as needed
+
       - name: Install dependencies
         run: npm ci
+
       - name: Install Playwright browsers
         run: npx playwright install
-      - name: Read yaml for sanity
-        if: github.event.inputs.testTag == 'sanity'
+
+      - name: Read yaml
         uses: mikefarah/yq@master
-        id: read_yaml_sanity
+        id: read_yaml
         with:
-          cmd: yq eval '.[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/sanity.yml
-      - name: Read yaml for smoke
-        if: github.event.inputs.testTag == 'smoke'
-        uses: mikefarah/yq@master
-        id: read_yaml_smoke
-        with:
-          cmd: yq eval '.[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/smoke.yml
-      - name: Read yaml for e2eFrontEnd
-        if: github.event.inputs.testTag == 'e2eFrontEnd'
-        uses: mikefarah/yq@master
-        id: read_yaml_shard
-        with:
-          cmd: yq eval '.[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml
-      - name: Running tests for sanity
-        if: github.event.inputs.testTag == 'sanity'
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml 
+
+      - name: Running tests
         run: |
-          tests="${{ steps.read_yaml_sanity.outputs.result }}"
-          tests=$(echo "$tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
-          tests=$(echo "$tests" | tr '\n' ' ')
-          echo "Running tests with tag: sanity"
-          npx playwright test --grep @sanity  $tests --workers=4
-      - name: Running tests for smoke
-        if: github.event.inputs.testTag == 'smoke'
-        run: |
-          tests="${{ steps.read_yaml_smoke.outputs.result }}"
-          tests=$(echo "$tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
-          tests=$(echo "$tests" | tr '\n' ' ')
-          echo "Running tests with tag: smoke"
-          npx playwright test --grep @smoke $tests --workers=4
-      - name: Running tests for e2eFrontEnd
-        if: github.event.inputs.testTag == 'e2eFrontEnd'
-        run: |
-          shard_tests="${{ steps.read_yaml_shard.outputs.result }}"
+          echo "Starting test::"
+          shard_tests="${{ steps.read_yaml.outputs.result }}"
+          echo "Shard tests are: $shard_tests"
+          shard_index=${{ matrix.shardIndex }}
+          echo "Shard tests for shard $shard_index :: "            
+
+          # Remove leading and trailing whitespaces from shard_tests
           shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
+
+          echo "Running test : $shard_tests"
+
+          # Replace newlines with spaces
           shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
-          echo "Running tests with tag: e2eFrontEnd"
-          npx playwright test $shard_tests --workers=4
+          echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
+          npx playwright test --grep @${{ github.event.inputs.testTag }} $tests --workers=4
+        
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
         with:
