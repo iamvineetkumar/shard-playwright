@@ -22,37 +22,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install yq
-        run: sudo apt-get install -y jq
+      - name: Install js-yaml
+        run: npm install js-yaml
 
-      - name: Read shard indices from sanity.yml
-        if: github.event.inputs.testTag == 'sanity'
-        id: read-sanity
-        run: |
-          indices=$(yq eval '.shards | keys' .github/workflows/sanity.yml)
-          indices=$(echo $indices | jq -c '.')
-          echo "::set-output name=indices::$indices"
-
-      - name: Read shard indices from smoke.yml
-        if: github.event.inputs.testTag == 'smoke'
-        id: read-smoke
-        run: |
-          indices=$(yq eval '.shards | keys' .github/workflows/smoke.yml)
-          indices=$(echo $indices | jq -c '.')
-          echo "::set-output name=indices::$indices"
-
-      - name: Read shard indices from test_mapping.yml
-        if: github.event.inputs.testTag == 'e2eFrontEnd'
-        id: read-e2e
-        run: |
-          indices=$(yq eval '.shards | keys' .github/workflows/test_mapping.yml)
-          indices=$(echo $indices | jq -c '.')
-          echo "::set-output name=indices::$indices"
+      - name: Read shard indices
+        id: read-shard-indices
+        uses: mikefarah/yq@master
+        with:
+          cmd: |
+            if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
+              yq eval '.shards | keys | map(tonumber)' .github/workflows/sanity.yml
+            elif [ "${{ github.event.inputs.testTag }}" == "smoke" ]; then
+              yq eval '.shards | keys | map(tonumber)' .github/workflows/smoke.yml
+            elif [ "${{ github.event.inputs.testTag }}" == "e2eFrontEnd" ]; then
+              yq eval '.shards | keys | map(tonumber)' .github/workflows/test_mapping.yml
+            else
+              echo "Unsupported testTag: ${{ github.event.inputs.testTag }}"
+              exit 1
+            fi
+        continue-on-error: true  # Continue even if one file doesn't exist or doesn't match the tag
 
       - name: Set matrix
         id: set-matrix
         run: |
-          indices="${{ steps.read-sanity.outputs.indices || steps.read-smoke.outputs.indices || steps.read-e2e.outputs.indices }}"
+          indices="${{ steps.read-shard-indices.outputs }}"
           matrix=$(jq -n --argjson indexes "$indices" '{"shardIndex": $indexes}')
           echo "::set-output name=matrix::$matrix"
 
@@ -98,7 +91,7 @@ jobs:
         uses: mikefarah/yq@master
         id: read_yaml_shard
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/shard.yml
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml
       - name: Running tests for sanity
         if: github.event.inputs.testTag == 'sanity'
         run: |
