@@ -41,12 +41,16 @@ jobs:
               exit 1
             fi
         continue-on-error: true  # Continue even if one file doesn't exist or doesn't match the tag
+        # Ensure output is in JSON array format even if empty or single value
+        env:
+          OUTPUT_FORMAT: ${{ steps.read-shard-indices.outputs.result || '[]' }}
 
       - name: Set matrix
         id: set-matrix
         run: |
-          indices="${{ steps.read-shard-indices.outputs }}"
-          matrix=$(jq -n --argjson indexes "$indices" '{"shardIndex": $indexes}')
+          matrix=$(echo "${{ env.OUTPUT_FORMAT }}" | jq -n '{
+            shardIndex: .[]
+          }')
           echo "::set-output name=matrix::$matrix"
 
   playwright-tests:
