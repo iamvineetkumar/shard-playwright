@@ -1,3 +1,7 @@
+shardIndex:
+  - 1
+  - 2
+  - 3
 shards:
   1:
     tests:
