@@ -41,7 +41,6 @@ jobs:
               exit 1
             fi
         continue-on-error: true  # Continue even if one file doesn't exist or doesn't match the tag
-        shell: bash
         env:
           OUTPUT_FORMAT: ${{ steps.read-shard-indices.outputs.result || '[]' }}
 
