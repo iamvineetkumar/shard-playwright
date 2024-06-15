@@ -2,8 +2,7 @@ name: Playwright Tests
 
 on:
   push:
-    branches:
-      - dev2
+    branches: [dev2]
   workflow_dispatch:
     inputs:
       testTag:
@@ -13,52 +12,79 @@ on:
         options:
           - sanity
           - smoke
-          - e2eFrontEnd
-        default: 'sanity'
+        default: 'sanity'  # Default tag
+      shardIndex:
+        description: 'Shard index to run'
+        required: true
+        type: integer
+        default: 1
+      shardTotal:
+        description: 'Total number of shards'
+        required: true
+        type: integer
+        default: 3
 
 jobs:
   playwright-tests:
+    timeout-minutes: 10  # Adjust timeout as per your test suite's needs
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shardIndex: [${{ github.event.inputs.shardIndex }}]  # Pass the shardIndex input dynamically
+        shardTotal: [${{ github.event.inputs.shardTotal }}]
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v2
-      with:
-        node-version: '18'
+      - name: Cache Node.js modules
+        uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
-    - name: Read shard indices from test_mapping.yml
-      id: set-shard-indices
-      uses: mikefarah/yq@v4
-      with:
-        script: '.shardIndex | .[]'
-        file: '.github/workflows/test_mapping.yml'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install js-yaml
+        run: npm install js-yaml
 
-    - name: Read tests from test_mapping.yml
-      id: read-tests
-      uses: mikefarah/yq@v4
-      with:
-        script: |
-          .shards[$((matrix.shardIndex - 1))].tests | .[]
-        file: '.github/workflows/test_mapping.yml'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '14'  # Adjust Node.js version as needed
 
-    - name: Install Playwright browsers
-      run: npx playwright install --with-deps
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Run Playwright tests
-      run: |
-        tests="${{ steps.read-tests.outputs }}"
-        npx playwright test $tests
+      - name: Install Playwright browsers
+        run: npx playwright install
 
-    - name: Upload blob report to GitHub Actions Artifacts
-      if: ${{ !cancelled() }}
-      uses: actions/upload-artifact@v4
-      with:
-        name: blob-report-${{ matrix.shardIndex }}
-        path: blob-report
-        retention-days: 1
+      - name: Read yaml
+        uses: mikefarah/yq@master
+        id: read_yaml
+        with:
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml 
+
+      - name: Running tests
+        run: |
+          echo "Starting test::"
+          shard_tests="${{ steps.read_yaml.outputs.result }}"
+          echo "Shard tests are: $shard_tests"
+          shard_index=${{ matrix.shardIndex }}
+          echo "Shard tests for shard $shard_index :: "            
+
+          # Remove leading and trailing whitespaces from shard_tests
+          shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
+
+          echo "Running test : $shard_tests"
+
+          # Replace newlines with spaces
+          shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
+          echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
+          npx playwright test --grep @${{ github.event.inputs.testTag }} $tests --workers=4
+        
+      - name: Upload blob report to GitHub Actions Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: blob-report-${{ matrix.shardIndex }}
+          path: blob-report
+          retention-days: 1
