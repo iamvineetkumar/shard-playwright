@@ -17,46 +17,88 @@ on:
 
 jobs:
   playwright-tests:
-    timeout-minutes: 2
+    timeout-minutes: 20
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      # Add caching, setup-node, npm install steps as needed
+      # Step to install necessary tools like js-yaml and yq
+      - name: Install js-yaml
+        run: npm install js-yaml
 
       - name: Install Playwright browsers
         run: npx playwright install
 
-      - name: Read shardIndex from smoke.yml
-        id: read_shard_index
-        run: |
-          shardIndex=$(yq eval '.shardIndex[]' .github/workflows/smoke.yml)
-          echo "::set-output name=shardIndex::$shardIndex"
-
-      - name: Read tests from smoke.yml based on shardIndex
+      # Step to read shardIndex and tests based on testTag
+      - name: Read shardIndex and tests based on testTag
         id: read_tests
         run: |
-          shardIndex="${{ steps.read_shard_index.outputs.shardIndex }}"
-          tests=$(yq eval ".shards[$shardIndex].tests | .[]" .github/workflows/smoke.yml)
+          testTag="${{ github.event.inputs.testTag }}"
+          if [ "$testTag" == "sanity" ]; then
+            shardIndex=$(yq eval '.shardIndex[0]' .github/workflows/sanity.yml)
+            tests=$(yq eval ".shards[$shardIndex].tests | .[]" .github/workflows/sanity.yml)
+          elif [ "$testTag" == "smoke" ]; then
+            shardIndex=$(yq eval '.shardIndex[0]' .github/workflows/smoke.yml)
+            tests=$(yq eval ".shards[$shardIndex].tests | .[]" .github/workflows/smoke.yml)
+          elif [ "$testTag" == "e2eFrontEnd" ]; then
+            shardIndex=$(yq eval '.shardIndex[0]' .github/workflows/shard.yml)  # Adjust as per your file name
+            tests=$(yq eval ".shards[$shardIndex].tests | .[]" .github/workflows/shard.yml)  # Adjust as per your file name
+          else
+            echo "Invalid testTag specified."
+            exit 1
+          fi
+          echo "::set-output name=shardIndex::$shardIndex"
           echo "::set-output name=tests::$tests"
 
-      - name: Run Playwright tests
+      # Steps to debug or print YAML content based on testTag
+      - name: Print YAML content based on testTag
         run: |
-          shardIndex="${{ steps.read_shard_index.outputs.shardIndex }}"
-          tests="${{ steps.read_tests.outputs.tests }}"
-          echo "Using shardIndex: $shardIndex"
-          echo "Running tests: $tests"
+          if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
+            cat .github/workflows/sanity.yml
+          elif [ "${{ github.event.inputs.testTag }}" == "smoke" ]; then
+            cat .github/workflows/smoke.yml
+          elif [ "${{ github.event.inputs.testTag }}" == "e2eFrontEnd" ]; then
+            cat .github/workflows/shard.yml  # Adjust as per your actual file name
+          else
+            echo "Invalid testTag specified."
+            exit 1
+          fi
 
-          # Additional steps using $shardIndex and $tests as needed
-          for test in $tests; do
-            echo "Running test: $test"
-            npx playwright test $test --workers=4
-          done
+      # Step to run tests based on testTag
+      - name: Run tests based on testTag
+        run: |
+          testTag="${{ github.event.inputs.testTag }}"
+          if [ "$testTag" == "sanity" ]; then
+            tests="${{ steps.read_tests.outputs.tests }}"
+            echo "Running tests with tag: sanity"
+            # Replace newlines with spaces
+            tests=$(echo "$tests" | tr '\n' ' ')
+            echo "Tests are: $tests"
+            npx playwright test --grep @sanity $tests --workers=4
+          elif [ "$testTag" == "smoke" ]; then
+            tests="${{ steps.read_tests.outputs.tests }}"
+            echo "Running tests with tag: smoke"
+            # Replace newlines with spaces
+            tests=$(echo "$tests" | tr '\n' ' ')
+            echo "Tests are: $tests"
+            npx playwright test --grep @smoke $tests --workers=4
+          elif [ "$testTag" == "e2eFrontEnd" ]; then
+            tests="${{ steps.read_tests.outputs.tests }}"
+            echo "Running tests with tag: e2eFrontEnd"
+            # Replace newlines with spaces
+            tests=$(echo "$tests" | tr '\n' ' ')
+            echo "Tests are: $tests"
+            npx playwright test $tests --workers=4
+          else
+            echo "Invalid testTag specified."
+            exit 1
+          fi
 
+      # Step to upload blob report as artifact
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: blob-report-${{ steps.read_shard_index.outputs.shardIndex }}
+          name: blob-report-${{ steps.read_tests.outputs.shardIndex }}
           path: blob-report
           retention-days: 1
