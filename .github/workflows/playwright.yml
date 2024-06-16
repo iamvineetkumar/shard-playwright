@@ -13,20 +13,27 @@ on:
         options:
           - sanity
           - smoke
+          - e2e
 
 jobs:
   setup-shard:
     runs-on: ubuntu-latest
     outputs:
       shard-index: ${{ steps.set-shard-index.outputs.shardIndex }}
+      testFile: ${{ steps.set-shard-index.outputs.testFile }}
     steps:
-      - name: Set shardIndex based on testTag
+      - name: Set shardIndex and testFile based on testTag
         id: set-shard-index
         run: |
           if [[ "${{ github.event.inputs.testTag }}" == "smoke" ]]; then
             echo "::set-output name=shardIndex::[1,2,3]"
+            echo "::set-output name=testFile::smoke.yml"
+          elif [[ "${{ github.event.inputs.testTag }}" == "e2e" ]]; then
+            echo "::set-output name=shardIndex::[1,2]"
+            echo "::set-output name=testFile::e2e.yml"
           else
             echo "::set-output name=shardIndex::[1]"
+            echo "::set-output name=testFile::sanity.yml"
           fi
 
   playwright-tests:
@@ -69,7 +76,7 @@ jobs:
         uses: mikefarah/yq@master
         id: read_yaml
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/smoke.yml
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
 
       - name: Running tests
         run: |
