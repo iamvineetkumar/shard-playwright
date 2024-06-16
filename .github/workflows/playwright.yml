@@ -21,17 +21,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Determine shardIndex and shardTotal
-        id: determine_shard
-        run: |
-          if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
-            echo "::set-output name=shardIndex::1"
-            echo "::set-output name=shardTotal::1"
-          elif [ "${{ github.event.inputs.testTag }}" == "smoke" ]; then
-            echo "::set-output name=shardIndex::1,2"
-            echo "::set-output name=shardTotal::2"
-          fi
-
       - name: Setup Node.js
         uses: actions/setup-node@v2
         with:
@@ -48,24 +37,16 @@ jobs:
         run: |
           if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
             echo "YAML_FILE=.github/workflows/sanity.yml" >> $GITHUB_ENV
+            echo "SHARD_INDEX=1" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.testTag }}" == "smoke" ]; then
             echo "YAML_FILE=.github/workflows/smoke.yml" >> $GITHUB_ENV
+            echo "SHARD_INDEX=1,2" >> $GITHUB_ENV
           fi
-
-      # Define the matrix strategy after determining shardIndex and shardTotal
-      - name: Set up matrix strategy
-        run: |
-          echo "Setting up matrix strategy..."
-          echo "matrix:"
-          echo "  testTag: ${{ github.event.inputs.testTag }}"
-          echo "  shardIndex: [${{ steps.determine_shard.outputs.shardIndex }}]"
-          echo "  shardTotal: [${{ steps.determine_shard.outputs.shardTotal }}]"
-          echo "::set-output name=matrix::testTag=${{ github.event.inputs.testTag }},shardIndex=${{ steps.determine_shard.outputs.shardIndex }},shardTotal=${{ steps.determine_shard.outputs.shardTotal }}"
 
       - name: Read yaml
         id: read_yaml
         run: |
-          SHARD_INDEX=$(echo "${{ steps.determine_shard.outputs.shardIndex }}" | tr ',' '\n' | sed 's/[][]//g')
+          SHARD_INDEX=$(echo "${{ env.SHARD_INDEX }}" | sed 's/,/ /g')
           TESTS=$(yq eval ".shards[$SHARD_INDEX - 1].tests | .[]" ${{ env.YAML_FILE }})
           echo "TESTS=$TESTS" >> $GITHUB_ENV
 
@@ -74,7 +55,7 @@ jobs:
           echo "Starting tests for ${{ github.event.inputs.testTag }}..."
           shard_tests="${{ env.TESTS }}"
           echo "Shard tests are: $shard_tests"
-          shard_index=${{ steps.determine_shard.outputs.shardIndex }}
+          shard_index=${{ env.SHARD_INDEX }}
           echo "Shard index for ${{ github.event.inputs.testTag }} tests: $shard_index"
 
           # Remove leading and trailing whitespaces from shard_tests
@@ -86,11 +67,11 @@ jobs:
           shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
 
           echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
-          npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=${{ steps.determine_shard.outputs.shardTotal }}
+          npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=$(echo "${shard_index}" | tr ',' '\n' | wc -l)
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: blob-report-${{ github.event.inputs.testTag }}-${{ steps.determine_shard.outputs.shardIndex }}
+          name: blob-report-${{ github.event.inputs.testTag }}-${{ env.SHARD_INDEX }}
           path: blob-report
           retention-days: 1
