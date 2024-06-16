@@ -13,17 +13,13 @@ on:
           - sanity
           - smoke
         default: 'sanity'  # Default tag
-      shardTotal:
-        description: 'Total number of shards'
-        required: true
-        type: Integer
-        default: 3
 
 jobs:
   calculate-shard-index:
     runs-on: ubuntu-latest
     outputs:
       shardIndex: ${{ steps.set_shard_index.outputs.shardIndex }}
+      shardTotal: ${{ steps.set_shard_index.outputs.shardTotal }}
 
     steps:
       - name: Set Shard Index
@@ -32,12 +28,15 @@ jobs:
           if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
             shardIndex='[1,2]'
           elif [ "${{ github.event.inputs.testTag }}" == "smoke" ]; then
-            shardIndex='[1,2,3]'
+            shardIndex='[1]'
           else
-            shardIndex='[1]'  # Default shard index
+            shardIndex='[1,2,3]'  # Default shard index
           fi
+          shardTotal=$(echo $shardIndex | jq length)
           echo "shardIndex: $shardIndex"
+          echo "shardTotal: $shardTotal"
           echo "::set-output name=shardIndex::$shardIndex"
+          echo "::set-output name=shardTotal::$shardTotal"
 
   playwright-tests:
     needs: calculate-shard-index
@@ -47,6 +46,7 @@ jobs:
       fail-fast: false
       matrix:
         shardIndex: ${{ fromJson(needs.calculate-shard-index.outputs.shardIndex) }}
+        shardTotal: [${{ needs.calculate-shard-index.outputs.shardTotal }}]
 
     steps:
       - uses: actions/checkout@v4
@@ -76,7 +76,7 @@ jobs:
         uses: mikefarah/yq@master
         id: read_yaml
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml 
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/smoke.yml 
 
       - name: Running tests
         run: |
