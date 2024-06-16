@@ -37,10 +37,10 @@ jobs:
         run: |
           if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
             echo "YAML_FILE=.github/workflows/sanity.yml" >> $GITHUB_ENV
-            echo "SHARD_INDEX=1" >> $GITHUB_ENV
+            echo "SHARD_INDEX=[1]" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.testTag }}" == "smoke" ]; then
             echo "YAML_FILE=.github/workflows/smoke.yml" >> $GITHUB_ENV
-            echo "SHARD_INDEX=1,2" >> $GITHUB_ENV
+            echo "SHARD_INDEX=[1,2]" >> $GITHUB_ENV
           fi
 
       - name: Read yaml
