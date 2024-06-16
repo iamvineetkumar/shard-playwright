@@ -65,7 +65,7 @@ jobs:
       - name: Read yaml
         id: read_yaml
         run: |
-          SHARD_INDEX=$(echo "${{ steps.determine_shard.outputs.shardIndex }}" | sed 's/,/ /g')
+          SHARD_INDEX=$(echo "${{ steps.determine_shard.outputs.shardIndex }}" | tr ',' '\n' | sed 's/[][]//g')
           TESTS=$(yq eval ".shards[$SHARD_INDEX - 1].tests | .[]" ${{ env.YAML_FILE }})
           echo "TESTS=$TESTS" >> $GITHUB_ENV
 
@@ -86,7 +86,7 @@ jobs:
           shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
 
           echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
-          npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=4
+          npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=${{ steps.determine_shard.outputs.shardTotal }}
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
