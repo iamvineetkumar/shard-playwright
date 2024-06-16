@@ -16,32 +16,39 @@ on:
           - e2e
 
 jobs:
+  setup-shard:
+    runs-on: ubuntu-latest
+    outputs:
+      shard-index: ${{ steps.set-shard-index.outputs.shardIndex }}
+      testFile: ${{ steps.set-shard-index.outputs.testFile }}
+    steps:
+      - name: Set shardIndex and testFile based on testTag
+        id: set-shard-index
+        run: |
+          if [[ "${{ github.event.inputs.testTag }}" == "smoke" ]]; then
+            echo "::set-output name=shardIndex::[1,2,3]"
+            echo "::set-output name=testFile::smoke.yml"
+          elif [[ "${{ github.event.inputs.testTag }}" == "e2e" ]]; then
+            echo "::set-output name=shardIndex::[1,2]"
+            echo "::set-output name=testFile::e2e.yml"
+          else
+            echo "::set-output name=shardIndex::[1]"
+            echo "::set-output name=testFile::sanity.yml"
+          fi
+
   playwright-tests:
+    needs: setup-shard
     timeout-minutes: 2
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shardIndex: ${{ fromJSON(env.SHARD_INDEX) }}
+        shardIndex: ${{ fromJSON(needs.setup-shard.outputs['shard-index']) }}
         shardTotal: [3]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set shardIndex and testFile based on testTag
-        id: set-shard-index
-        run: |
-          if [[ "${{ github.event.inputs.testTag }}" == "smoke" ]]; then
-            echo "SHARD_INDEX=[1,2,3]" >> $GITHUB_ENV
-            echo "TEST_FILE=smoke.yml" >> $GITHUB_ENV
-          elif [[ "${{ github.event.inputs.testTag }}" == "e2e" ]]; then
-            echo "SHARD_INDEX=[1,2]" >> $GITHUB_ENV
-            echo "TEST_FILE=e2e.yml" >> $GITHUB_ENV
-          else
-            echo "SHARD_INDEX=[1]" >> $GITHUB_ENV
-            echo "TEST_FILE=sanity.yml" >> $GITHUB_ENV
-          fi
 
       - name: Cache Node.js modules
         uses: actions/cache@v2
@@ -69,7 +76,7 @@ jobs:
         uses: mikefarah/yq@master
         id: read_yaml
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/${{ env.TEST_FILE }}
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
 
       - name: Running tests
         run: |
