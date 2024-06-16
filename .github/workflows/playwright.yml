@@ -46,8 +46,8 @@ jobs:
       - name: Read yaml
         id: read_yaml
         run: |
-          SHARD_INDEX=$(echo "${{ env.SHARD_INDEX }}" | sed 's/,/ /g')
-          TESTS=$(yq eval ".shards[$SHARD_INDEX - 1].tests | .[]" ${{ env.YAML_FILE }})
+          SHARD_INDEX="${{ env.SHARD_INDEX }}"
+          TESTS=$(yq eval ".shards[$SHARD_INDEX].tests | .[]" ${{ env.YAML_FILE }})
           echo "TESTS=$TESTS" >> $GITHUB_ENV
 
       - name: Running tests
@@ -55,7 +55,7 @@ jobs:
           echo "Starting tests for ${{ github.event.inputs.testTag }}..."
           shard_tests="${{ env.TESTS }}"
           echo "Shard tests are: $shard_tests"
-          shard_index=${{ env.SHARD_INDEX }}
+          shard_index="${{ env.SHARD_INDEX }}"
           echo "Shard index for ${{ github.event.inputs.testTag }} tests: $shard_index"
 
           # Remove leading and trailing whitespaces from shard_tests
@@ -67,7 +67,7 @@ jobs:
           shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
 
           echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
-          npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=$(echo "${shard_index}" | tr ',' '\n' | wc -l)
+          npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=$(echo "$shard_index" | tr ',' '\n' | wc -l)
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
