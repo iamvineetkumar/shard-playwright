@@ -16,40 +16,35 @@ on:
 jobs:
   playwright-tests:
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
-        testTag: [sanity, smoke]
-      fail-fast: false
-      include:
-        - testTag: sanity
-          shardIndex: 1
-          shardTotal: 1
-        - testTag: smoke
-          shardIndex: [1, 2]
-          shardTotal: 2
+        testTag: ${{ github.event.inputs.testTag }}
+        shardIndex: ${{ fromJson(needs.determine_shard.outputs.shardIndex) }}
+        shardTotal: ${{ fromJson(needs.determine_shard.outputs.shardTotal) }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
 
-      - name: Cache Node.js modules
-        uses: actions/cache@v2
+      - name: Determine shardIndex and shardTotal
+        id: determine_shard
+        run: |
+          if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
+            echo "::set-output name=shardIndex::[1]"
+            echo "::set-output name=shardTotal::[1]"
+          elif [ "${{ github.event.inputs.testTag }}" == "smoke" ]; then
+            echo "::set-output name=shardIndex::[1, 2]"
+            echo "::set-output name=shardTotal::[2]"
+          fi
+
+      - name: Install Node.js
+        uses: actions/setup-node@v2
         with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Install js-yaml
-        run: npm install js-yaml
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 14
+          node-version: '14'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Install Playwright browsers
         run: npx playwright install
@@ -57,25 +52,26 @@ jobs:
       - name: Determine YAML file based on testTag
         id: determine_yaml
         run: |
-          if [ "${{ matrix.testTag }}" == "sanity" ]; then
+          if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
             echo "YAML_FILE=.github/workflows/sanity.yml" >> $GITHUB_ENV
-          elif [ "${{ matrix.testTag }}" == "smoke" ]; then
+          elif [ "${{ github.event.inputs.testTag }}" == "smoke" ]; then
             echo "YAML_FILE=.github/workflows/smoke.yml" >> $GITHUB_ENV
           fi
 
       - name: Read yaml
-        uses: mikefarah/yq@4
         id: read_yaml
-        with:
-          cmd: yq eval ".shards[${{ matrix.shardIndex }} - 1].tests | .[]" ${{ env.YAML_FILE }}
+        run: |
+          SHARD_INDEX=$(echo "${{ matrix.shardIndex }}" | sed 's/[][]//g')
+          TESTS=$(yq eval ".shards[$SHARD_INDEX - 1].tests | .[]" ${{ env.YAML_FILE }})
+          echo "TESTS=$TESTS" >> $GITHUB_ENV
 
       - name: Running tests
         run: |
-          echo "Starting tests for ${{ matrix.testTag }}..."
-          shard_tests="${{ steps.read_yaml.outputs.result }}"
+          echo "Starting tests for ${{ github.event.inputs.testTag }}..."
+          shard_tests="${{ env.TESTS }}"
           echo "Shard tests are: $shard_tests"
           shard_index=${{ matrix.shardIndex }}
-          echo "Shard index for ${{ matrix.testTag }} tests: $shard_index"
+          echo "Shard index for ${{ github.event.inputs.testTag }} tests: $shard_index"
 
           # Remove leading and trailing whitespaces from shard_tests
           shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
@@ -85,12 +81,12 @@ jobs:
           # Replace newlines with spaces
           shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
 
-          echo "Running tests with tag: ${{ matrix.testTag }}"
-          npx playwright test --grep @${{ matrix.testTag }} $shard_tests --workers=4
+          echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
+          npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=4
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: blob-report-${{ matrix.testTag }}-${{ matrix.shardIndex }}
+          name: blob-report-${{ github.event.inputs.testTag }}-${SHARD_INDEX}
           path: blob-report
           retention-days: 1
