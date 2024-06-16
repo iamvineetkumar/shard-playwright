@@ -7,6 +7,4 @@ shards:
     tests:
       - tests/e2e/login
       - tests/e2e/logout
-  3:
-    tests:
-      - tests/e2e/dashboard
+

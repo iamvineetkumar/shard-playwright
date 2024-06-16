@@ -21,8 +21,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shardIndex: [1, 2, 3]
-        shardTotal: [3]
+        include:
+          - testTag: sanity
+            shardIndex: [1]
+            shardTotal: 1
+          - testTag: smoke
+            shardIndex: [1, 2]
+            shardTotal: 2
     steps:
       - uses: actions/checkout@v4
 
@@ -47,10 +52,10 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install
 
-      - name: Determine YAML file based on testTag
-        id: determine_yaml
+      - name: Set YAML file based on testTag
+        id: set_yaml_file
         run: |
-          if [ "${{ github.event.inputs.testTag }}" == "sanity" ]; then
+          if [ "${{ matrix.testTag }}" == "sanity" ]; then
             echo "YAML_FILE=.github/workflows/sanity.yml" >> $GITHUB_ENV
           else
             echo "YAML_FILE=.github/workflows/smoke.yml" >> $GITHUB_ENV
@@ -77,8 +82,8 @@ jobs:
             
           # Replace newlines with spaces
           shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
-          echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
-          npx playwright test --grep @${{ github.event.inputs.testTag }} $tests --workers=4
+          echo "Running tests with tag: ${{ matrix.testTag }}"
+          npx playwright test --grep @${{ matrix.testTag }} $shard_tests --workers=4
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
