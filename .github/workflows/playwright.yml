@@ -15,42 +15,68 @@ on:
           - smoke
 
 jobs:
+  setup-shard:
+    runs-on: ubuntu-latest
+    outputs:
+      shard-index: ${{ steps.set-shard-index.outputs.shardIndex }}
+    steps:
+      - name: Set shardIndex based on testTag
+        id: set-shard-index
+        run: |
+          if [[ "${{ github.event.inputs.testTag }}" == "smoke" ]]; then
+            echo "::set-output name=shardIndex::[1,2,3]"
+          else
+            echo "::set-output name=shardIndex::[1]"
+          fi
+
   playwright-tests:
+    needs: setup-shard
     timeout-minutes: 2
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shardTotal: [3]  # Assuming shardTotal remains constant
+        shardIndex: ${{ fromJSON(needs.setup-shard.outputs['shard-index']) }}
+        shardTotal: [3]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set shardIndex based on testTag
-        run: |
-          if [[ "${{ github.event.inputs.testTag }}" == "smoke" ]]; then
-            echo 'shardIndex: [1, 2, 3]' > smoke.yml
-          else
-            echo 'shardIndex: [1]' > sanity.yml
-          fi
+      - name: Cache Node.js modules
+        uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
-      - name: Read shardIndex from file
-        id: read_shardIndex
-        run: echo "::set-output name=shardIndex::$(cat shardIndex.yml)"
+      - name: Install js-yaml
+        run: npm install js-yaml
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 19
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install
 
       - name: Read yaml
         uses: mikefarah/yq@master
         id: read_yaml
         with:
-          cmd: yq eval '.shards[${{ steps.read_shardIndex.outputs.shardIndex }}].tests | .[]' .github/workflows/smoke.yml
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/smoke.yml
 
       - name: Running tests
         run: |
           echo "Test starting test::"
           shard_tests="${{ steps.read_yaml.outputs.result }}"
           echo "Shard tests are: $shard_tests"
-          shard_index=${{ steps.read_shardIndex.outputs.shardIndex }}
+          shard_index=${{ matrix.shardIndex }}
           echo "Shard tests for shard $shard_index :: "
           
           # Additional steps for running tests based on $shard_tests and $shard_index
@@ -62,6 +88,6 @@ jobs:
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: blob-report-${{ steps.read_shardIndex.outputs.shardIndex }}
+          name: blob-report-${{ matrix.shardIndex }}
           path: blob-report
           retention-days: 1
