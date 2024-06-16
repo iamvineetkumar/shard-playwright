@@ -4,15 +4,15 @@ on:
   push:
     branches: [dev2]
   workflow_dispatch:
-    inputs:
-      testTag:
-        description: 'Select the type of tests to run'
-        required: true
-        type: choice
-        options:
-          - sanity
-          - smoke
-        default: 'sanity'  # Default tag
+      inputs:
+        testTag:
+          description: 'Select the type of tests to run'
+          required: true
+          type: choice
+          options:
+            - sanity
+            - smoke
+          default: 'sanity'  # Default tag
 
 jobs:
   playwright-tests:
@@ -52,38 +52,33 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install
 
-      - name: Set YAML file based on testTag
-        id: set_yaml_file
-        run: |
-          if [ "${{ matrix.testTag }}" == "sanity" ]; then
-            echo "YAML_FILE=.github/workflows/sanity.yml" >> $GITHUB_ENV
-          else
-            echo "YAML_FILE=.github/workflows/smoke.yml" >> $GITHUB_ENV
-          fi
-
       - name: Read yaml
         uses: mikefarah/yq@master
         id: read_yaml
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' ${{ env.YAML_FILE }}
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/sanity.yml 
       
       - name: Running tests
         run: |
-          echo "test starting test::"
-          shard_tests="${{ steps.read_yaml.outputs.result }}"
-          echo "Shard tests are: $shard_tests"
-          shard_index=${{ matrix.shardIndex }}
-          echo "Shard tests for shard $shard_index :: "            
+            echo "test starting test::"
+            shard_tests="${{ steps.read_yaml.outputs.result }}"
+            echo "Shard tests are: $shard_tests"
+            shard_index=${{ matrix.shardIndex }}
+            echo "Shard tests for shard $shard_index :: "            
             
-          # Remove leading and trailing whitespaces from shard_tests
-          shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
+            # Remove leading and trailing whitespaces from shard_tests
+            shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
             
-          echo "Running test : $shard_tests"
+            echo "Running test : $shard_tests"
             
-          # Replace newlines with spaces
-          shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
-          echo "Running tests with tag: ${{ matrix.testTag }}"
-          npx playwright test --grep @${{ matrix.testTag }} $shard_tests --workers=4
+            # Replace newlines with spaces
+            shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
+            echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
+            npx playwright test --grep @${{ github.event.inputs.testTag }} $tests --workers=4
+        
+        
+      
+      
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v2
