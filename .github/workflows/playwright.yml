@@ -26,7 +26,7 @@ jobs:
         id: set-shard-index
         run: |
           if [[ "${{ github.event.inputs.testTag }}" == "smoke" ]]; then
-            echo "::set-output name=shardIndex::[1,2,3]"
+            echo "::set-output name=shardIndex::[1]"
             echo "::set-output name=testFile::smoke.yml"
           elif [[ "${{ github.event.inputs.testTag }}" == "e2e" ]]; then
             echo "::set-output name=shardIndex::[1,2]"
@@ -81,9 +81,14 @@ jobs:
         uses: mikefarah/yq@master
         id: read_worker
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].workers[0] | .[]' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
-        
-
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].workers' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
+      - name: Print YAML File
+        run: cat tests/shard.yml 
+      - name: Debug Worker Value
+        run: |
+          worker_value=$(yq eval '.shards[${{ matrix.shardIndex }}].workers' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
+          echo "Extracted worker_value: '$worker_value'"      
+      
       - name: Running tests
         run: |
           echo "Test starting test::"
