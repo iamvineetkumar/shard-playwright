@@ -82,8 +82,6 @@ jobs:
         id: read_worker
         with:
           cmd: yq eval '.shards[${{ matrix.shardIndex }}].workers' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
-      - name: Print YAML File
-        run: cat tests/shard.yml 
       - name: Debug Worker Value
         run: |
           worker_value=$(yq eval '.shards[${{ matrix.shardIndex }}].workers' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
