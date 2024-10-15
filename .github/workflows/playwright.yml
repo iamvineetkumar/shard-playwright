@@ -44,7 +44,7 @@ jobs:
       fail-fast: false
       matrix:
         shardIndex: ${{ fromJSON(needs.setup-shard.outputs['shard-index']) }}
-        shardTotal: [1]
+        shardTotal: [3]
 
     steps:
       - name: Checkout repository

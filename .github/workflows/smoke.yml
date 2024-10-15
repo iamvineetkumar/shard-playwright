@@ -3,4 +3,4 @@ shards:
     tests:
       - tests/e2e/setup
       - tests/e2e/user1
-    wokers: 3
+    workers: 3
