@@ -84,7 +84,7 @@ jobs:
           cmd: yq eval '.shards[${{ matrix.shardIndex }}].workers' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
       - name: Debug Worker Value
         run: |
-          worker_value=$(yq eval '.shards[${{ matrix.shardIndex }}].workers' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
+          worker_value=$(yq eval '.shards[${{ matrix.shardIndex }}].workers' .github/workflows/${{ needs.setup-shard.outputs.testFile }})
           echo "Extracted worker_value: '$worker_value'"      
       
       - name: Running tests
@@ -94,10 +94,8 @@ jobs:
           echo "Shard tests are: $shard_tests"
           shard_index=${{ matrix.shardIndex }}
           echo "Shard tests for shard $shard_index :: "
-          worker_value=$(yq eval '.shards[1].workers' .github/workflows/smoke.yml)
-          echo "Extracted worker_value: '$worker_value'"
-          # Debug: Print the raw worker_value
-          echo "Extracted worker_value: '$worker_value'"
+          worker_value="${{ steps.read_worker.outputs.result }}"
+          echo "Worker value for shard ${{ matrix.shardIndex }}: $worker_value"
 
           # Trim leading and trailing spaces
           worker_value=$(echo "$worker_value" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
@@ -113,7 +111,8 @@ jobs:
           shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
           shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
           echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
-          npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=4
+          echo "Running tests: $shard_tests with workers=$worker_value"
+          npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=$worker_value
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v3
