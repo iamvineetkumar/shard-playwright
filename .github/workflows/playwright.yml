@@ -94,7 +94,8 @@ jobs:
           echo "Shard tests are: $shard_tests"
           shard_index=${{ matrix.shardIndex }}
           echo "Shard tests for shard $shard_index :: "
-          worker_value="${{ steps.read_worker.outputs.result }}"
+          worker_value=$(yq eval '.shards[1].workers' .github/workflows/smoke.yml)
+          echo "Extracted worker_value: '$worker_value'"
           # Debug: Print the raw worker_value
           echo "Extracted worker_value: '$worker_value'"
 
