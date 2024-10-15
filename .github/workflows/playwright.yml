@@ -77,6 +77,12 @@ jobs:
         id: read_yaml
         with:
           cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
+      - name: Read worker value from YAML
+        uses: mikefarah/yq@master
+        id: read_worker
+        with:
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].workers[0] | .[]' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
+        
 
       - name: Running tests
         run: |
@@ -85,6 +91,19 @@ jobs:
           echo "Shard tests are: $shard_tests"
           shard_index=${{ matrix.shardIndex }}
           echo "Shard tests for shard $shard_index :: "
+          worker_value="${{ steps.read_worker.outputs.result }}"
+          # Debug: Print the raw worker_value
+          echo "Extracted worker_value: '$worker_value'"
+
+          # Trim leading and trailing spaces
+          worker_value=$(echo "$worker_value" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
+          # Validate the worker_value is a valid number
+          if ! [[ "$worker_value" =~ ^[0-9]+$ ]]; then
+            echo "Error: Worker value must be a valid number. Extracted value: '$worker_value'"
+            exit 1
+          fi
+
+          echo "Running tests: $shard_tests with workers=$worker_value"
           
           # Additional steps for running tests based on $shard_tests and $shard_index
           shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
