@@ -38,7 +38,7 @@ jobs:
 
   playwright-tests:
     needs: setup-shard
-    timeout-minutes: 2
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -58,14 +58,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
 
-      - name: Install js-yaml
-        run: npm install js-yaml
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 19
-
       - name: Install dependencies
         run: npm ci
 
@@ -80,21 +72,29 @@ jobs:
 
       - name: Running tests
         run: |
-          echo "Test starting test::"
           shard_tests="${{ steps.read_yaml.outputs.result }}"
-          echo "Shard tests are: $shard_tests"
           shard_index=${{ matrix.shardIndex }}
-          echo "Shard tests for shard $shard_index :: "
           
-          # Additional steps for running tests based on $shard_tests and $shard_index
-          shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
-          shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
-          echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
-          npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=4
+          if [ -f failed-tests.json ]; then
+            # Re-run only failed tests if `failed-tests.json` exists
+            FAILED_TESTS=$(jq -r '.[]' failed-tests.json | xargs -I {} echo "\"{}\"" | paste -sd " " -)
+            echo "Re-running only failed tests: $FAILED_TESTS"
+            npx playwright test --grep-title "$FAILED_TESTS" --workers=4
+          else
+            # Run all tests for the shard if `failed-tests.json` does not exist
+            shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
+            echo "Running all tests for shard $shard_index"
+            npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=4
 
-      - name: Upload blob report to GitHub Actions Artifacts
-        uses: actions/upload-artifact@v4
+      - name: Capture Failed Tests
+        if: failure()
+        run: |
+          npx playwright test --reporter=json > report.json
+          jq '[.suites[].specs[] | select(.results[].status=="failed") | .title]' report.json > failed-tests.json
+
+      - name: Upload failed-tests.json as artifact
+        uses: actions/upload-artifact@v3
+        if: failure()
         with:
-          name: blob-report-${{ matrix.shardIndex }}
-          path: blob-report
-          retention-days: 1
+          name: failed-tests-${{ matrix.shardIndex }}
+          path: failed-tests.json
