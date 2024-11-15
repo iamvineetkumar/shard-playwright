@@ -2,29 +2,53 @@ name: Playwright Tests
 
 on:
   push:
-    branches: [dev2]
+    branches: [dev3]
   workflow_dispatch:
-      inputs:
-        testTag:
-          description: 'Select the type of tests to run'
-          required: true
-          type: choice
-          options:
-            - sanity
-            - smoke
-          default: 'sanity'  # Default tag
+    inputs:
+      testTag:
+        description: 'Select the type of tests to run'
+        required: true
+        type: choice
+        default: 'sanity'
+        options:
+          - sanity
+          - smoke
+          - e2e
 
 jobs:
+  setup-shard:
+    runs-on: ubuntu-latest
+    outputs:
+      shard-index: ${{ steps.set-shard-index.outputs.shardIndex }}
+      testFile: ${{ steps.set-shard-index.outputs.testFile }}
+    steps:
+      - name: Set shardIndex and testFile based on testTag
+        id: set-shard-index
+        run: |
+          if [[ "${{ github.event.inputs.testTag }}" == "smoke" ]]; then
+            echo "::set-output name=shardIndex::[1,2,3]"
+            echo "::set-output name=testFile::smoke.yml"
+          elif [[ "${{ github.event.inputs.testTag }}" == "e2e" ]]; then
+            echo "::set-output name=shardIndex::[1,2]"
+            echo "::set-output name=testFile::e2e.yml"
+          else
+            echo "::set-output name=shardIndex::[1]"
+            echo "::set-output name=testFile::sanity.yml"
+          fi
+
   playwright-tests:
-    timeout-minutes: 2
+    needs: setup-shard
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shardIndex: [1, 2, 3]
+        shardIndex: ${{ fromJSON(needs.setup-shard.outputs['shard-index']) }}
         shardTotal: [3]
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Cache Node.js modules
         uses: actions/cache@v2
@@ -33,13 +57,6 @@ jobs:
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
-
-      - name: Install js-yaml
-        run: npm install js-yaml
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 19
 
       - name: Install dependencies
         run: npm ci
@@ -51,33 +68,33 @@ jobs:
         uses: mikefarah/yq@master
         id: read_yaml
         with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/test_mapping.yml 
-      
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
+
       - name: Running tests
         run: |
-            echo "test starting test::"
-            shard_tests="${{ steps.read_yaml.outputs.result }}"
-            echo "Shard tests are: $shard_tests"
-            shard_index=${{ matrix.shardIndex }}
-            echo "Shard tests for shard $shard_index :: "            
-            
-            # Remove leading and trailing whitespaces from shard_tests
-            shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
-            
-            echo "Running test : $shard_tests"
-            
-            # Replace newlines with spaces
+          shard_tests="${{ steps.read_yaml.outputs.result }}"
+          shard_index=${{ matrix.shardIndex }}
+          
+          if [ -f failed-tests.json ]; then
+            # Re-run only failed tests if `failed-tests.json` exists
+            FAILED_TESTS=$(jq -r '.[]' failed-tests.json | xargs -I {} echo "\"{}\"" | paste -sd " " -)
+            echo "Re-running only failed tests: $FAILED_TESTS"
+            npx playwright test --grep-title "$FAILED_TESTS" --workers=4
+          else
+            # Run all tests for the shard if `failed-tests.json` does not exist
             shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
-            echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
-            npx playwright test --grep @${{ github.event.inputs.testTag }} $tests --workers=4
-        
-        
-      
-      
+            echo "Running all tests for shard $shard_index"
+            npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=4
 
-      - name: Upload blob report to GitHub Actions Artifacts
-        uses: actions/upload-artifact@v2
+      - name: Capture Failed Tests
+        if: failure()
+        run: |
+          npx playwright test --reporter=json > report.json
+          jq '[.suites[].specs[] | select(.results[].status=="failed") | .title]' report.json > failed-tests.json
+
+      - name: Upload failed-tests.json as artifact
+        uses: actions/upload-artifact@v3
+        if: failure()
         with:
-          name: blob-report-${{ matrix.shardIndex }}
-          path: blob-report
-          retention-days: 1
+          name: failed-tests-${{ matrix.shardIndex }}
+          path: failed-tests.json
