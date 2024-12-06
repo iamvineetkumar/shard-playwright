@@ -2,7 +2,7 @@ name: Playwright Tests
 
 on:
   push:
-    branches: [dev3]
+    branches: [dev2]
   workflow_dispatch:
     inputs:
       testTag:
@@ -38,7 +38,7 @@ jobs:
 
   playwright-tests:
     needs: setup-shard
-    timeout-minutes: 10
+    timeout-minutes: 2
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -58,6 +58,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
 
+      - name: Install js-yaml
+        run: npm install js-yaml
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 19
+
       - name: Install dependencies
         run: npm ci
 
@@ -69,32 +77,43 @@ jobs:
         id: read_yaml
         with:
           cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
+      - name: Read worker value from YAML
+        uses: mikefarah/yq@master
+        id: read_worker
+        with:
+          cmd: yq eval '.shards[${{ matrix.shardIndex }}].workers[0] | .[]' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
+        
 
       - name: Running tests
         run: |
+          echo "Test starting test::"
           shard_tests="${{ steps.read_yaml.outputs.result }}"
+          echo "Shard tests are: $shard_tests"
           shard_index=${{ matrix.shardIndex }}
+          echo "Shard tests for shard $shard_index :: "
+          worker_value="${{ steps.read_worker.outputs.result }}"
+          # Debug: Print the raw worker_value
+          echo "Extracted worker_value: '$worker_value'"
+
+          # Trim leading and trailing spaces
+          worker_value=$(echo "$worker_value" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
+          # Validate the worker_value is a valid number
+          if ! [[ "$worker_value" =~ ^[0-9]+$ ]]; then
+            echo "Error: Worker value must be a valid number. Extracted value: '$worker_value'"
+            exit 1
+          fi
+
+          echo "Running tests: $shard_tests with workers=$worker_value"
           
-          if [ -f failed-tests.json ]; then
-            # Re-run only failed tests if `failed-tests.json` exists
-            FAILED_TESTS=$(jq -r '.[]' failed-tests.json | xargs -I {} echo "\"{}\"" | paste -sd " " -)
-            echo "Re-running only failed tests: $FAILED_TESTS"
-            npx playwright test --grep-title "$FAILED_TESTS" --workers=4
-          else
-            # Run all tests for the shard if `failed-tests.json` does not exist
-            shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
-            echo "Running all tests for shard $shard_index"
-            npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=4
+          # Additional steps for running tests based on $shard_tests and $shard_index
+          shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
+          shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
+          echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
+          npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=4
 
-      - name: Capture Failed Tests
-        if: failure()
-        run: |
-          npx playwright test --reporter=json > report.json
-          jq '[.suites[].specs[] | select(.results[].status=="failed") | .title]' report.json > failed-tests.json
-
-      - name: Upload failed-tests.json as artifact
+      - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v3
-        if: failure()
         with:
-          name: failed-tests-${{ matrix.shardIndex }}
-          path: failed-tests.json
+          name: blob-report-${{ matrix.shardIndex }}
+          path: blob-report
+          retention-days: 1
