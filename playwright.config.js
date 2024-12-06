@@ -1,21 +1,21 @@
 // @ts-check
 const { defineConfig, devices } = require('@playwright/test');
-const fs = require('fs');
+//const fs = require('fs');
 
 // Read failed tests from a JSON file if it exists
-let failedTests = [];
-if (fs.existsSync('failed-tests.json')) {
-  const rawData = fs.readFileSync('failed-tests.json', 'utf-8');
-  failedTests = JSON.parse(rawData);
-}
+//let failedTests = [];
+//if (fs.existsSync('failed-tests.json')) {
+//  const rawData = fs.readFileSync('failed-tests.json', 'utf-8');
+//  failedTests = JSON.parse(rawData);//
+//}
 
 module.exports = defineConfig({
   testDir: './tests',
   outputDir: 'test-results', // Custom output directory for test results
   reporter: [
-    ['list'], // Default console reporter
-    ['json', { outputFile: 'test-results/report.json' }], // JSON reporter
-    ['html', { outputFolder: 'test-results/html-report', open: 'never' }] // HTML reporter
+  //  ['list'], // Default console reporter
+  //  ['json', { outputFile: 'test-results/report.json' }], // JSON reporter
+  //  ['html', { outputFolder: 'test-results/html-report', open: 'never' }] // HTML reporter
   ],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
