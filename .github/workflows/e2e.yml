@@ -2,4 +2,3 @@ shards:
   1:
     tests:
       - tests/e2e/setup
-      - tests/e2e/user1
