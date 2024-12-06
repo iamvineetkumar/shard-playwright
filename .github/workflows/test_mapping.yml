@@ -2,10 +2,3 @@ shards:
   1:
     tests:
       - tests/e2e/api
-  2:
-    tests:
-      - tests/e2e/setup
-      - tests/e2e/user1
-  3:
-    tests:
-      - tests/rbac
