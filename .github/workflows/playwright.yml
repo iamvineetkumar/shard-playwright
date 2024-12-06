@@ -100,7 +100,10 @@ jobs:
           # Trim leading and trailing spaces
           worker_value=$(echo "$worker_value" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
           # Validate the worker_value is a valid number
-          if ! [[ "$worker_value" =~ ^[0-9]+$ ]]; then
+          if [ "$worker_value" -eq "$worker_value" ] 2>/dev/null; then
+            echo "Error: Worker value must be a valid number. Extracted value: '$worker_value'"
+            echo "Worker value is a valid number: $worker_value"
+          else
             echo "Error: Worker value must be a valid number. Extracted value: '$worker_value'"
             exit 1
           fi
