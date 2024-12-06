@@ -90,7 +90,7 @@ jobs:
           shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
           shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
           echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
-          npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=4
+          npx playwright test  $shard_tests --workers=4
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v3
