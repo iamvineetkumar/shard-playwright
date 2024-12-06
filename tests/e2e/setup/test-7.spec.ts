@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test('six @smoke', async ({ page }) => {
   await page.goto('https://www.msn.com/');
+  console.log(" >>>>>>>1")
  
 });
 
@@ -9,6 +10,7 @@ test('six @smoke', async ({ page }) => {
 
 test('get started link @smoke', async ({ page }) => {
   await page.goto('https://playwright.dev/');
+  console.log(">>>>>>>>>>2")
 
   // Click the get started link.
   //await page.getByRole('link', { name: 'Get started9888988888' }).click();
@@ -21,6 +23,7 @@ test('get started link @smoke', async ({ page }) => {
 
 test('get started 1link @smoke', async ({ page }) => {
   await page.goto('https://playwright.dev/');
+  console.log(">>>>>>>>>>3")
 
   // Click the get started link.
   await page.getByRole('link', { name: 'Get started9888988888' }).click();
