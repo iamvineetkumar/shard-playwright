@@ -26,7 +26,7 @@ module.exports = defineConfig({
   },
 
   // Conditionally set the `grep` filter if there are failed tests
-  grep: failedTests.length ? new RegExp(failedTests.join('|')) : undefined,
+  //grep: failedTests.length ? new RegExp(failedTests.join('|')) : undefined,
 
   projects: [
     {
