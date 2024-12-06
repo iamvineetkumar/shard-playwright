@@ -26,7 +26,7 @@ jobs:
         id: set-shard-index
         run: |
           if [[ "${{ github.event.inputs.testTag }}" == "smoke" ]]; then
-            echo "::set-output name=shardIndex::[1]"
+            echo "::set-output name=shardIndex::[1,2,3]"
             echo "::set-output name=testFile::smoke.yml"
           elif [[ "${{ github.event.inputs.testTag }}" == "e2e" ]]; then
             echo "::set-output name=shardIndex::[1,2]"
@@ -77,16 +77,7 @@ jobs:
         id: read_yaml
         with:
           cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
-      - name: Read worker value from YAML
-        uses: mikefarah/yq@master
-        id: read_worker
-        with:
-          cmd: yq eval '.shards[${{ matrix.shardIndex }}].workers' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
-      - name: Debug Worker Value
-        run: |
-          worker_value=$(yq eval '.shards[${{ matrix.shardIndex }}].workers' .github/workflows/${{ needs.setup-shard.outputs.testFile }})
-          echo "Extracted worker_value: '$worker_value'"      
-      
+
       - name: Running tests
         run: |
           echo "Test starting test::"
@@ -94,32 +85,12 @@ jobs:
           echo "Shard tests are: $shard_tests"
           shard_index=${{ matrix.shardIndex }}
           echo "Shard tests for shard $shard_index :: "
-          worker_value="${{ steps.read_worker.outputs.result }}"
-          echo "Worker value for shard ${{ matrix.shardIndex }}: $worker_value"
-
-          # Trim leading and trailing spaces
-          worker_value=$(echo "$worker_value" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
-          # Validate the worker_value is a valid number
-          if [ "$worker_value" -eq "$worker_value" ] 2>/dev/null; then
-            echo "Error: Worker value must be a valid number. Extracted value: '$worker_value'"
-            echo "Worker value is a valid number: $worker_value"
-          else
-            echo "Error: Worker value must be a valid number. Extracted value: '$worker_value'"
-            exit 1
-          fi
-
-          echo "Running tests: $shard_tests with workers=$worker_value"
           
           # Additional steps for running tests based on $shard_tests and $shard_index
           shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
           shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
           echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
-          echo "Running tests: $shard_tests with workers=$worker_value"
-          echo "npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=$worker_value"
-          # npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=$worker_value
-          npx playwright test  @${{ github.event.inputs.testTag }} $shard_tests 
-
-         
+          npx playwright test --grep @${{ github.event.inputs.testTag }} $shard_tests --workers=4
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v3
