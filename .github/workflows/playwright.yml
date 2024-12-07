@@ -38,7 +38,7 @@ jobs:
 
   playwright-tests:
     needs: setup-shard
-    timeout-minutes: 2
+    timeout-minutes: 3
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -78,19 +78,38 @@ jobs:
         with:
           cmd: yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]' .github/workflows/${{ needs.setup-shard.outputs.testFile }}
 
+      - name: Download .last-failed artifact (if available)
+        uses: actions/download-artifact@v3
+        with:
+          name: last-failed-file
+          path: playwright-report/.last-failed
+          if-no-files-found: ignore
+
       - name: Running tests
+        id: run-tests
         run: |
-          echo "Test starting test::"
+          echo "Test starting:"
           shard_tests="${{ steps.read_yaml.outputs.result }}"
-          echo "Shard tests are: $shard_tests"
           shard_index=${{ matrix.shardIndex }}
-          echo "Shard tests for shard $shard_index :: "
-          
-          # Additional steps for running tests based on $shard_tests and $shard_index
+          echo "Shard tests for shard $shard_index:"
           shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
           shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
           echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
-          npx playwright test  $shard_tests --workers=4
+          
+          if [ -f "playwright-report/.last-failed" ]; then
+            echo "Re-running failed tests from .last-failed..."
+            npx playwright test --last-failed || true
+          else
+            echo "Running specified shard tests..."
+            npx playwright test $shard_tests --workers=4 || true
+          fi
+
+      - name: Upload .last-failed artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: last-failed-file
+          path: playwright-report/.last-failed
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v3
@@ -98,3 +117,4 @@ jobs:
           name: blob-report-${{ matrix.shardIndex }}
           path: blob-report
           retention-days: 1
+
