@@ -110,6 +110,17 @@ jobs:
         with:
           name: last-failed-file
           path: playwright-report/.last-failed
+      - name: Print .last-failed contents
+        if: always()
+        run: |
+          if [ -f "playwright-report/.last-failed" ]; then
+            echo "Contents of .last-failed:"
+            cat playwright-report/.last-failed
+          else
+            echo "No .last-failed file found."
+          fi  
+          
+      
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v3
