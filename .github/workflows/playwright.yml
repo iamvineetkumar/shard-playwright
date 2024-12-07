@@ -100,10 +100,10 @@ jobs:
 
           if [ -f "playwright-report/.last-failed" ]; then
             echo "Re-running failed tests from .last-failed..."
-            npx playwright test --last-failed || true
+            npx playwright test --last-failed
           else
             echo "Running specified shard tests..."
-            npx playwright test $shard_tests --workers=4 || true
+            npx playwright test $shard_tests --workers=4
           fi
       - name: Check if .last-failed file exists
         run: |
