@@ -26,7 +26,7 @@ test('get started 1link @smoke', async ({ page }) => {
   console.log(">>>>>>>>>>3")
 
   // Click the get started link.
-  await page.getByRole('link', { name: 'Get started9888988888' }).click();
+  await page.getByRole('link', { name: 'Get started' }).click();
 
   // Expects page to have a heading with the name of Installation.
   await expect(page.getByRole('heading', { name: 'Installation123312321' })).toBeVisible();
