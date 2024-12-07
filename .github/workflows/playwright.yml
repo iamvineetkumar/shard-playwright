@@ -29,7 +29,7 @@ jobs:
             echo "::set-output name=shardIndex::[1,2,3]"
             echo "::set-output name=testFile::smoke.yml"
           elif [[ "${{ github.event.inputs.testTag }}" == "e2e" ]]; then
-            echo "::set-output name=shardIndex::[1,2]"
+            echo "::set-output name=shardIndex::[1]"
             echo "::set-output name=testFile::e2e.yml"
           else
             echo "::set-output name=shardIndex::[1]"
