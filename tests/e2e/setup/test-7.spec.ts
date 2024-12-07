@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('six @smoke', async ({ page }) => {
-  await page.goto('https://www.msn.com/');
+  await page.goto('https://playwright.dev/');
   console.log(" >>>>>>>1")
  
 });
