@@ -1,5 +1,6 @@
 name: Playwright Tests
-'on':
+
+on:
   push:
     branches:
       - dev2
@@ -14,6 +15,11 @@ name: Playwright Tests
           - sanity
           - smoke
           - e2e
+      confirm:
+        description: "Type 'confirm' to proceed with the deployment"
+        required: true
+        default: ""
+
 jobs:
   setup-shard:
     runs-on: ubuntu-latest
@@ -29,99 +35,4 @@ jobs:
             echo "::set-output name=testFile::smoke.yml"
           elif [[ "${{ github.event.inputs.testTag }}" == "e2e" ]]; then
             echo "::set-output name=shardIndex::[1]"
-            echo "::set-output name=testFile::e2e.yml"
-          else
-            echo "::set-output name=shardIndex::[1]"
-            echo "::set-output name=testFile::sanity.yml"
-          fi
-  playwright-tests:
-    needs: setup-shard
-    timeout-minutes: 3
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shardIndex: '${{ fromJSON(needs.setup-shard.outputs[''shard-index'']) }}'
-        shardTotal:
-          - 3
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Cache Node.js modules
-        uses: actions/cache@v2
-        with:
-          path: ~/.npm
-          key: '${{ runner.os }}-node-${{ hashFiles(''**/package-lock.json'') }}'
-          restore-keys: |
-            ${{ runner.os }}-node-
-      - name: Install js-yaml
-        run: npm install js-yaml
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 19
-      - name: Install dependencies
-        run: npm ci
-      - name: Install Playwright browsers
-        run: npx playwright install
-      - name: Read yaml
-        uses: mikefarah/yq@master
-        id: read_yaml
-        with:
-          cmd: >-
-            yq eval '.shards[${{ matrix.shardIndex }}].tests | .[]'
-            .github/workflows/${{ needs.setup-shard.outputs.testFile }}
-      - name: Download .last-failed artifact (if available)
-        uses: actions/download-artifact@v3
-        with:
-          name: last-failed-file
-          path: playwright-report/.last-failed
-        continue-on-error: true
-      - name: Running tests
-        id: run-tests
-        run: >
-          echo "Test starting:"
-
-          shard_tests="${{ steps.read_yaml.outputs.result }}"
-
-          shard_index=${{ matrix.shardIndex }}
-
-          echo "Shard tests for shard $shard_index:"
-
-          shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[
-          \t]*$//')
-
-          shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
-
-          echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
-
-
-          # Check if .last-failed exists and rerun failed tests if needed
-
-          if [ -f "playwright-report/.last-failed" ]; then
-            echo "Re-running failed tests from .last-failed..."
-            npx playwright test --last-failed
-          else
-            echo "Running specified shard tests..."
-            npx playwright test $shard_tests --workers=4
-          fi
-      - name: Check if .last-failed file exists
-        run: |
-          if [ -f "playwright-report/.last-failed" ]; then
-            echo ".last-failed file found:"
-            cat playwright-report/.last-failed
-          else
-            echo "No .last-failed file found."
-          fi
-      - name: Upload .last-failed artifact
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: last-failed-file
-          path: playwright-report/.last-failed
-      - name: Upload blob report to GitHub Actions Artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: 'blob-report-${{ matrix.shardIndex }}'
-          path: blob-report
-          retention-days: 1
+            
