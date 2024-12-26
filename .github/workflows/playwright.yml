@@ -24,12 +24,12 @@ jobs:
   setup-shard:
     runs-on: ubuntu-latest
     outputs:
-      shard-index: '${{ steps.set-shard-index.outputs.shardIndex }}'
-      testFile: '${{ steps.set-shard-index.outputs.testFile }}'
+      shard-index: ${{ steps.set-shard-index.outputs.shardIndex }}
+      testFile: ${{ steps.set-shard-index.outputs.testFile }}
     steps:
       - name: Validate Confirmation
         run: |
-          if [ "${{ inputs.confirm }}" != "confirm" ]; then
+          if [ "${{ github.event.inputs.confirm }}" != "confirm" ]; then
             echo "Deployment canceled: Confirmation not provided."
             exit 1
           fi
@@ -42,4 +42,8 @@ jobs:
             echo "::set-output name=testFile::smoke.yml"
           elif [[ "${{ github.event.inputs.testTag }}" == "e2e" ]]; then
             echo "::set-output name=shardIndex::[1]"
-            
+            echo "::set-output name=testFile::e2e.yml"
+          else
+            echo "::set-output name=shardIndex::[1]"
+            echo "::set-output name=testFile::sanity.yml"
+          fi
