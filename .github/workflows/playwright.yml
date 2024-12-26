@@ -14,6 +14,10 @@ on:
           - sanity
           - smoke
           - e2e
+      confirm:
+        description: "Type 'confirm' to proceed with the deployment"
+        required: true
+        default: ""
 
 jobs:
   setup-shard:
@@ -22,6 +26,13 @@ jobs:
       shard-index: ${{ steps.set-shard-index.outputs.shardIndex }}
       testFile: ${{ steps.set-shard-index.outputs.testFile }}
     steps:
+      - name: Validate Confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "confirm" ]; then
+            echo "Deployment canceled: Confirmation not provided."
+            exit 1
+          fi
+
       - name: Set shardIndex and testFile based on testTag
         id: set-shard-index
         run: |
@@ -90,7 +101,7 @@ jobs:
           shard_tests=$(echo "$shard_tests" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
           shard_tests=$(echo "$shard_tests" | tr '\n' ' ')
           echo "Running tests with tag: ${{ github.event.inputs.testTag }}"
-          npx playwright test  $shard_tests --workers=4
+          npx playwright test $shard_tests --workers=4
 
       - name: Upload blob report to GitHub Actions Artifacts
         uses: actions/upload-artifact@v3
