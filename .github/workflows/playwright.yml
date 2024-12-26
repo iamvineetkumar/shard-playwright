@@ -27,6 +27,13 @@ jobs:
       shard-index: '${{ steps.set-shard-index.outputs.shardIndex }}'
       testFile: '${{ steps.set-shard-index.outputs.testFile }}'
     steps:
+      - name: Validate Confirmation
+        run: |
+          if [ "${{ inputs.confirm }}" != "confirm" ]; then
+            echo "Deployment canceled: Confirmation not provided."
+            exit 1
+          fi
+      
       - name: Set shardIndex and testFile based on testTag
         id: set-shard-index
         run: |
